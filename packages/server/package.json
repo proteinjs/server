@@ -55,7 +55,10 @@
         "util": "0.12.5",
         "webpack": "5.88.2",
         "webpack-dev-middleware": "7.0.0",
-        "webpack-hot-middleware": "2.26.0"
+        "webpack-hot-middleware": "2.26.0",
+        "@types/react": "18.2.23",
+        "@types/react-helmet": "6.1.0",
+        "@types/webpack-hot-middleware": "2.25.9"
     },
     "devDependencies": {
         "@proteinjs/reflection-build": "1.0.5",
@@ -66,10 +69,7 @@
         "@types/express-session": "1.17.0",
         "@types/node": "14.0.13",
         "@types/passport": "1.0.4",
-        "@types/passport-local": "1.0.33",
-        "@types/react": "18.2.23",
-        "@types/react-helmet": "6.1.0",
-        "@types/webpack-hot-middleware": "2.25.9"
+        "@types/passport-local": "1.0.33"
     },
     "main": "./dist/generated/index.js",
     "types": "./dist/generated/index.d.ts"
