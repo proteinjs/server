@@ -2,6 +2,9 @@
     "name": "@proteinjs/server-api",
     "version": "1.0.1",
     "description": "Server apis only (server implementation in @proteinjs/server)",
+    "publishConfig": {
+        "access": "public"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/brentbahry/server.git"
