@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.7](https://github.com/brentbahry/server/compare/@proteinjs/server@1.0.6...@proteinjs/server@1.0.7) (2024-04-19)
+
+
+### Bug Fixes
+
+* fixed server version ([dcea65a](https://github.com/brentbahry/server/commit/dcea65a231c894ff7872f48b9b6d36b44d28b72e))
+
+
+
+
+
 ## [1.0.6](https://github.com/brentbahry/server/compare/@proteinjs/server@1.0.5...@proteinjs/server@1.0.6) (2024-04-19)
 
 **Note:** Version bump only for package @proteinjs/server
