@@ -1,8 +1,10 @@
 {
     "name": "@proteinjs/server",
-    "private": true,
     "version": "1.0.0",
     "description": "A server impl",
+    "publishConfig": {
+        "access": "public"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/brentbahry/server.git"
@@ -22,8 +24,8 @@
     "dependencies": {
         "@proteinjs/reflection": "1.0.2",
         "@proteinjs/util": "1.0.18",
-        "@proteinjs/db": "file:../../db/db",
-        "@proteinjs/server-api": "file:../api",
+        "@proteinjs/db": "1.0.3",
+        "@proteinjs/server-api": "1.0.2",
         "body-parser": "1.19.0",
         "compression": "1.7.4",
         "cookie-parser": "1.4.5",
