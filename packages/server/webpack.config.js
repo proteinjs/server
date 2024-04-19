@@ -3,8 +3,9 @@ var webpack = require('webpack');
 const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 const ReactRefreshTypeScript = require('react-refresh-typescript');
 
+const nodeModulesPath = path.join(__dirname, '../../../');
 // if there are module resolution issues, verify assumptions about pathing
-// console.log(`__dirname in webpack.config: ${__dirname}`);
+// console.log(`nodeModulesPath: ${nodeModulesPath}`);
 
 // see  https://github.com/webpack/webpack/issues/11467#issuecomment-808618999/
 // for details
@@ -31,12 +32,12 @@ module.exports = {
   resolve: {
     extensions: ['.tsx', '.ts', '.js', '.json'],
     alias: {
-      'react': path.join(__dirname, '../node_modules/react'),
+      'react': path.join(nodeModulesPath, 'react'),
       'process': 'process/browser',
-      '@mui/joy': path.join(__dirname, '../node_modules/@mui/joy'),
-      '@mui/material': path.join(__dirname, '../node_modules/@mui/material'),
-      '@mui/icons-material': path.join(__dirname, '../node_modules/@mui/icons-material'),
-      'webpack-hot-middleware': path.join(__dirname, '../node_modules/webpack-hot-middleware'),
+      '@mui/joy': path.join(nodeModulesPath, '@mui/joy'),
+      '@mui/material': path.join(nodeModulesPath, '@mui/material'),
+      '@mui/icons-material': path.join(nodeModulesPath, '@mui/icons-material'),
+      'webpack-hot-middleware': path.join(nodeModulesPath, 'webpack-hot-middleware'),
     },
     // provide shims for node libraries for webpack >= 5
     fallback: { 
@@ -53,7 +54,7 @@ module.exports = {
   // we need to let webpack know where to look for loaders like: file-loader and ts-loader
   // it's ideal to keep those dependencies within this package instead of requiring them installed by the consumer
   resolveLoader: {
-    modules: [path.resolve(__dirname, '../node_modules'), 'node_modules'],
+    modules: [nodeModulesPath, 'node_modules'],
   },
   module: {
     rules: [

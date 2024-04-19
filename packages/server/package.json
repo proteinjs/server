@@ -7,19 +7,18 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/brentbahry/server.git"
+        "url": "git+https://github.com/proteinjs/server.git"
     },
     "bugs": {
-        "url": "https://github.com/brentbahry/server/issues"
+        "url": "https://github.com/proteinjs/server/issues"
     },
-    "homepage": "https://github.com/brentbahry/server#readme",
+    "homepage": "https://github.com/proteinjs/server#readme",
     "author": "Brent Bahry",
-    "license": "ISC",
+    "license": "MIT",
     "scripts": {
         "clean": "rm -rf dist/ generated/ node_modules/ package-lock.json",
         "build": "reflection-build && tsc",
-        "watch": "reflection-watch",
-        "dev": "DEVELOPMENT=true node dist/generated/index.js"
+        "watch": "reflection-watch"
     },
     "dependencies": {
         "@pmmmwh/react-refresh-webpack-plugin": "0.5.11",
