@@ -12,8 +12,8 @@ import { Db } from '@proteinjs/db';
 import { ServerConfig, getRoutes } from '@proteinjs/server-api';
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { Logger } from '@proteinjs/util';
+import { setNodeModulesPath } from './nodeModulesPath';
 
-const webpackConfig = require('../webpack.config');
 const staticContentPath = '/static/';
 const logger = new Logger('Server');
 
@@ -53,10 +53,10 @@ function configureRequests(server: express.Express) {
 }
 
 function initializeHotReloading(server: express.Express, config: ServerConfig) {
-    if (!process.env.DEVELOPMENT || process.env.DISABLE_HOT_CLIENT_BUILDS || config.disableHotClientBuilds || !config.staticContent?.staticContentDir || !config.staticContent?.appEntryPath)
+    if (!process.env.DEVELOPMENT || process.env.DISABLE_HOT_CLIENT_BUILDS || !config.hotClientBuilds || !config.staticContent?.staticContentDir || !config.staticContent?.appEntryPath)
         return;
 
-    let wpConfig = Object.assign({}, webpackConfig);
+    let wpConfig = Object.assign({}, getWebpackConfig(config));
     wpConfig['entry'] = { app: ['webpack-hot-middleware/client', config.staticContent.appEntryPath] };
     wpConfig['output']['path'] = config.staticContent.staticContentDir;
     wpConfig['output']['publicPath'] = staticContentPath;
@@ -65,6 +65,12 @@ function initializeHotReloading(server: express.Express, config: ServerConfig) {
         publicPath: staticContentPath,
     }));
     server.use(webpackHotMiddleware(webpackCompiler));
+}
+
+function getWebpackConfig(config: ServerConfig) {
+    setNodeModulesPath(config.hotClientBuilds?.nodeModulesPath as string);
+    const webpackConfig = require('../webpack.config');
+    return webpackConfig;
 }
 
 function configureHttps(server: express.Express) {

@@ -2,8 +2,9 @@ var path = require('path');
 var webpack = require('webpack');
 const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 const ReactRefreshTypeScript = require('react-refresh-typescript');
+const { nodeModulesPath } = require('./src/nodeModulesPath');
 
-const nodeModulesPath = path.join(__dirname, '../../../');
+// const nodeModulesPath = path.join(__dirname, '../../../');
 // if there are module resolution issues, verify assumptions about pathing
 // console.log(`nodeModulesPath: ${nodeModulesPath}`);
 

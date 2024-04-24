@@ -16,7 +16,10 @@ export interface ServerConfig {
         /** Used for hot reloading of bundle assets */
         appEntryPath?: string;
     };
-    /** disables webpack builds on server-side, will instead serve bundle from staticContent.bundlePaths (default prod behavior) */
+    /** enables webpack builds on server-side; otherwise will serve bundle from staticContent.bundlePaths (default prod behavior) */
+    hotClientBuilds?: {
+        nodeModulesPath: string;
+    };
     disableHotClientBuilds?: boolean;
     port?: number;
     request?: {
