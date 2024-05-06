@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.1.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.0.17...@proteinjs/server@1.1.0) (2024-05-06)
+
+
+### Features
+
+* `ServerConfig` now accepts a bundles directory instead of bundle paths (deprecated) so the server can support dynamic bundle names (ie. when you generate a hash as part of the bundle name for cache busting) ([f3d7cef](https://github.com/proteinjs/server/commit/f3d7cefd58cb0b220470e886e161fbc028ca2df9))
+
+
+
+
+
 ## [1.0.11](https://github.com/proteinjs/server/compare/@proteinjs/server@1.0.10...@proteinjs/server@1.0.11) (2024-04-24)
 
 
