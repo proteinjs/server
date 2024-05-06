@@ -1,6 +1,7 @@
 import path from 'path';
 import ReactHelmet from 'react-helmet';
 import { ServerConfig, getServerRenderedScripts } from '@proteinjs/server-api';
+import { Fs } from '@proteinjs/util-node';
 
 export const createReactApp = (serverConfig: ServerConfig) => {
     return {
@@ -10,8 +11,8 @@ export const createReactApp = (serverConfig: ServerConfig) => {
             if (request.path.startsWith('/static'))
                 return;
 
-            if (!serverConfig.staticContent?.bundlePaths)
-                throw new Error(`ServerConfig.bundlePath must be provided to serve react app`);
+            if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir))
+                throw new Error(`ServerConfig.bundlePath or ServerConfig.bundlesDir must be provided to serve a react app`);
 
             const helmet = ReactHelmet.renderStatic();
             response.send(`<!DOCTYPE html>
@@ -28,7 +29,7 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                         <div id='app'></div>
                         <script>proteinjs = {};</script>
                         ${await serverRenderedScriptTags()}
-                        ${bundleScriptTags(serverConfig)}
+                        ${await bundleScriptTags(serverConfig)}
                     </body>
                 </html>`
             );
@@ -36,13 +37,22 @@ export const createReactApp = (serverConfig: ServerConfig) => {
     }
 }
 
-function bundleScriptTags(serverConfig: ServerConfig) {
-    if (!serverConfig.staticContent?.bundlePaths)
+async function bundleScriptTags(serverConfig: ServerConfig) {
+    if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir))
         return;
 
     const scriptTags: string[] = [];
-    for (const bundlePath of serverConfig.staticContent.bundlePaths)
-        scriptTags.push(`<script src='${path.join('/static/', bundlePath)}'></script>`);
+    if (serverConfig.staticContent?.bundlePaths) {
+        for (const bundlePath of serverConfig.staticContent.bundlePaths)
+            scriptTags.push(`<script src='${path.join('/static/', bundlePath)}'></script>`);
+    } else if (serverConfig.staticContent?.bundlesDir && serverConfig.staticContent?.staticContentDir) {
+        const resolvedBundlesDir = path.join(serverConfig.staticContent.staticContentDir, serverConfig.staticContent.bundlesDir);
+        const filePaths = await Fs.getFilePathsMatchingGlob(resolvedBundlesDir, '**/*.js');
+        for (const filePath of filePaths) {
+            const relativePath = path.relative(serverConfig.staticContent.staticContentDir, filePath);
+            scriptTags.push(`<script src='${path.join('/static/', relativePath)}'></script>`);
+        }
+      }
 
     return scriptTags.join('\n');
 }

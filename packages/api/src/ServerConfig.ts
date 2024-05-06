@@ -9,8 +9,10 @@ export interface ServerConfig {
     authenticate?: (username: string, password: string) => Promise<true|string>;
     staticContent?: {
         staticContentDir?: string;
-        /** Relative from `staticContentDir` */
+        /** @deprecated use bundlesDir instead */
         bundlePaths?: string[];
+        /** Dir containing bundles; relative from `staticContentDir`. */
+        bundlesDir?: string;
         /** Relative from `staticContentDir` */
         faviconPath?: string;
         /** Used for hot reloading of bundle assets */

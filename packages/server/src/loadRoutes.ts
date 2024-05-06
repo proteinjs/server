@@ -40,7 +40,7 @@ export function loadDefaultStarRoute(routes: Route[], server: express.Express, c
         }
     }
     
-    if (!starRouteSpecified && config.staticContent?.bundlePaths) {
+    if (!starRouteSpecified && (config.staticContent?.bundlePaths || config.staticContent?.bundlesDir)) {
         const reactApp = createReactApp(config);
         server[reactApp.method](reactApp.path, wrapRoute(reactApp.onRequest, config));
     }
