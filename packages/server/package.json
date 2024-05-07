@@ -64,7 +64,8 @@
         "@types/passport-local": "1.0.33",
         "@types/react": "18.2.23",
         "@types/react-helmet": "6.1.0",
-        "@types/webpack-hot-middleware": "2.25.9"
+        "@types/webpack-hot-middleware": "2.25.9",
+        "prettier": "3.2.5"
     },
     "main": "./dist/generated/index.js",
     "types": "./dist/generated/index.d.ts"
