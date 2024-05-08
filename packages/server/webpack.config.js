@@ -13,8 +13,8 @@ const { nodeModulesPath } = require('./src/nodeModulesPath');
 const webpack5esmInteropRule = {
   test: /\.m?js/,
   resolve: {
-    fullySpecified: false
-  }
+    fullySpecified: false,
+  },
 };
 
 module.exports = {
@@ -28,26 +28,26 @@ module.exports = {
     filename: '[name].js',
     // path and publicPath provided in startServer.initializeHotReloading
     // path: path.join(__dirname, 'dist'),
-    library: '[name]'
+    library: '[name]',
   },
   resolve: {
     extensions: ['.tsx', '.ts', '.js', '.json'],
     alias: {
-      'react': path.join(nodeModulesPath, 'react'),
-      'process': 'process/browser',
+      react: path.join(nodeModulesPath, 'react'),
+      process: 'process/browser',
       '@mui/joy': path.join(nodeModulesPath, '@mui/joy'),
       '@mui/material': path.join(nodeModulesPath, '@mui/material'),
       '@mui/icons-material': path.join(nodeModulesPath, '@mui/icons-material'),
       'webpack-hot-middleware': path.join(nodeModulesPath, 'webpack-hot-middleware'),
     },
     // provide shims for node libraries for webpack >= 5
-    fallback: { 
-      'crypto': require.resolve('crypto-browserify'),
-      'util': require.resolve('util/'),
-      'events': require.resolve('events/'),
-      'url': require.resolve('url/'),
-      'buffer': require.resolve('buffer/'),
-      'stream': require.resolve('stream-browserify'),
+    fallback: {
+      crypto: require.resolve('crypto-browserify'),
+      util: require.resolve('util/'),
+      events: require.resolve('events/'),
+      url: require.resolve('url/'),
+      buffer: require.resolve('buffer/'),
+      stream: require.resolve('stream-browserify'),
       'process/browser': require.resolve('process/browser'),
     },
   },
@@ -95,18 +95,18 @@ module.exports = {
     splitChunks: {
       cacheGroups: {
         vendor: {
-          test: /[\\/]node_modules[\\/]/,  // Matches node_modules folder
+          test: /[\\/]node_modules[\\/]/, // Matches node_modules folder
           name: 'vendor',
           chunks: 'all',
-          priority: -10
-        }
-      }
-    }
+          priority: -10,
+        },
+      },
+    },
   },
   plugins: [
     new webpack.ProvidePlugin({
-        process: 'process/browser',                 
-        Buffer: ['buffer', 'Buffer'],
+      process: 'process/browser',
+      Buffer: ['buffer', 'Buffer'],
     }),
     new webpack.HotModuleReplacementPlugin(),
     new ReactRefreshWebpackPlugin(),

@@ -4,18 +4,17 @@ import { ServerConfig, getServerRenderedScripts } from '@proteinjs/server-api';
 import { Fs } from '@proteinjs/util-node';
 
 export const createReactApp = (serverConfig: ServerConfig) => {
-    return {
-        path: '*',
-        method: 'get' as 'get',
-        onRequest: async (request: any, response: any): Promise<void> => {
-            if (request.path.startsWith('/static'))
-                return;
+  return {
+    path: '*',
+    method: 'get' as const,
+    onRequest: async (request: any, response: any): Promise<void> => {
+      if (request.path.startsWith('/static')) return;
 
-            if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir))
-                throw new Error(`ServerConfig.bundlePath or ServerConfig.bundlesDir must be provided to serve a react app`);
+      if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir))
+        throw new Error(`ServerConfig.bundlePath or ServerConfig.bundlesDir must be provided to serve a react app`);
 
-            const helmet = ReactHelmet.renderStatic();
-            response.send(`<!DOCTYPE html>
+      const helmet = ReactHelmet.renderStatic();
+      response.send(`<!DOCTYPE html>
                 <html ${helmet.htmlAttributes}>
                     <head>
                         <meta charset='utf-8' />
@@ -31,37 +30,37 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                         ${await serverRenderedScriptTags()}
                         ${await bundleScriptTags(serverConfig)}
                     </body>
-                </html>`
-            );
-        }
-    }
-}
+                </html>`);
+    },
+  };
+};
 
 async function bundleScriptTags(serverConfig: ServerConfig) {
-    if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir))
-        return;
+  if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir)) return;
 
-    const scriptTags: string[] = [];
-    if (serverConfig.staticContent?.bundlePaths) {
-        for (const bundlePath of serverConfig.staticContent.bundlePaths)
-            scriptTags.push(`<script src='${path.join('/static/', bundlePath)}'></script>`);
-    } else if (serverConfig.staticContent?.bundlesDir && serverConfig.staticContent?.staticContentDir) {
-        const resolvedBundlesDir = path.join(serverConfig.staticContent.staticContentDir, serverConfig.staticContent.bundlesDir);
-        const filePaths = await Fs.getFilePathsMatchingGlob(resolvedBundlesDir, '**/*.js');
-        for (const filePath of filePaths) {
-            const relativePath = path.relative(serverConfig.staticContent.staticContentDir, filePath);
-            scriptTags.push(`<script src='${path.join('/static/', relativePath)}'></script>`);
-        }
-      }
+  const scriptTags: string[] = [];
+  if (serverConfig.staticContent?.bundlePaths) {
+    for (const bundlePath of serverConfig.staticContent.bundlePaths)
+      scriptTags.push(`<script src='${path.join('/static/', bundlePath)}'></script>`);
+  } else if (serverConfig.staticContent?.bundlesDir && serverConfig.staticContent?.staticContentDir) {
+    const resolvedBundlesDir = path.join(
+      serverConfig.staticContent.staticContentDir,
+      serverConfig.staticContent.bundlesDir
+    );
+    const filePaths = await Fs.getFilePathsMatchingGlob(resolvedBundlesDir, '**/*.js');
+    for (const filePath of filePaths) {
+      const relativePath = path.relative(serverConfig.staticContent.staticContentDir, filePath);
+      scriptTags.push(`<script src='${path.join('/static/', relativePath)}'></script>`);
+    }
+  }
 
-    return scriptTags.join('\n');
+  return scriptTags.join('\n');
 }
 
 async function serverRenderedScriptTags() {
-    const scripts = getServerRenderedScripts();
-    const scriptTags: string[] = [];
-    for (const script of scripts)
-        scriptTags.push(`<script>${await script.script()}</script>`);
+  const scripts = getServerRenderedScripts();
+  const scriptTags: string[] = [];
+  for (const script of scripts) scriptTags.push(`<script>${await script.script()}</script>`);
 
-    return scriptTags.join('\n');
+  return scriptTags.join('\n');
 }
