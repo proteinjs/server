@@ -11,7 +11,9 @@ export const getSessionDataStorage = () => {
     '@proteinjs/server-api/SessionDataStorage'
   );
   for (const sessionDataStorage of sessionDataStorages) {
-    if (sessionDataStorage.environment == 'browser' && typeof window === 'undefined') continue;
+    if (sessionDataStorage.environment == 'browser' && typeof window === 'undefined') {
+      continue;
+    }
 
     return sessionDataStorage;
   }
@@ -36,7 +38,9 @@ export class Session {
 
   static getDataByKey<T>(sessionDataCacheKey: string): T | undefined {
     const sessionData = Session.getData();
-    if (!sessionData) return undefined;
+    if (!sessionData) {
+      return undefined;
+    }
 
     return sessionData.data[sessionDataCacheKey];
   }

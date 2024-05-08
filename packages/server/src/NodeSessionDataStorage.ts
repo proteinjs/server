@@ -7,15 +7,21 @@ export class NodeSessionDataStorage implements SessionDataStorage {
   environment = 'node' as const;
 
   setData(data: SessionData) {
-    if (!NodeSessionDataStorage.HOOK_INITIALIZED) this.initHook();
+    if (!NodeSessionDataStorage.HOOK_INITIALIZED) {
+      this.initHook();
+    }
 
-    if (NodeSessionDataStorage.SESSION_DATA[asyncHooks.executionAsyncId()]) return;
+    if (NodeSessionDataStorage.SESSION_DATA[asyncHooks.executionAsyncId()]) {
+      return;
+    }
 
     NodeSessionDataStorage.SESSION_DATA[asyncHooks.executionAsyncId()] = data;
   }
 
   getData(): SessionData {
-    if (!NodeSessionDataStorage.HOOK_INITIALIZED) this.initHook();
+    if (!NodeSessionDataStorage.HOOK_INITIALIZED) {
+      this.initHook();
+    }
 
     return NodeSessionDataStorage.SESSION_DATA[asyncHooks.executionAsyncId()];
   }
@@ -24,7 +30,9 @@ export class NodeSessionDataStorage implements SessionDataStorage {
     asyncHooks
       .createHook({
         init: (asyncId: number, type: string, triggerAsyncId: number, resource: Object) => {
-          if (!NodeSessionDataStorage.SESSION_DATA[triggerAsyncId]) return;
+          if (!NodeSessionDataStorage.SESSION_DATA[triggerAsyncId]) {
+            return;
+          }
 
           NodeSessionDataStorage.SESSION_DATA[asyncId] = NodeSessionDataStorage.SESSION_DATA[triggerAsyncId];
         },

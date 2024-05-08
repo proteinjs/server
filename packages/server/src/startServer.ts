@@ -45,7 +45,9 @@ export async function startServer(config: ServerConfig) {
 async function runStartupEvents(config: ServerConfig) {
   await new Db().init();
 
-  if (config.onStartup) await config.onStartup();
+  if (config.onStartup) {
+    await config.onStartup();
+  }
 }
 
 function configureRequests(server: express.Express) {
@@ -68,8 +70,9 @@ function initializeHotReloading(server: express.Express, config: ServerConfig) {
     !config.hotClientBuilds ||
     !config.staticContent?.staticContentDir ||
     !config.staticContent?.appEntryPath
-  )
+  ) {
     return;
+  }
 
   const wpConfig = Object.assign({}, getWebpackConfig(config));
   wpConfig['entry'] = { app: ['webpack-hot-middleware/client', config.staticContent.appEntryPath] };
@@ -103,7 +106,9 @@ function configureHttps(server: express.Express) {
 }
 
 function configureStaticContentRouter(server: express.Express, config: ServerConfig) {
-  if (!config.staticContent?.staticContentDir) return;
+  if (!config.staticContent?.staticContentDir) {
+    return;
+  }
 
   server.use(staticContentPath, express.static(config.staticContent.staticContentDir));
   logger.info(
@@ -126,16 +131,22 @@ function configureSession(server: express.Express, config: ServerConfig) {
 
   if (!process.env.DEVELOPMENT) {
     server.set('trust proxy', 1);
-    if (!sessionOptions.cookie) sessionOptions.cookie = {};
+    if (!sessionOptions.cookie) {
+      sessionOptions.cookie = {};
+    }
     sessionOptions.cookie.secure = true;
   }
 
-  if (config.session) sessionOptions = Object.assign(sessionOptions, config.session);
+  if (config.session) {
+    sessionOptions = Object.assign(sessionOptions, config.session);
+  }
 
   server.use(expressSession(sessionOptions));
   server.use(passport.initialize());
   server.use(passport.session());
-  if (config.authenticate) initializeAuthentication(config.authenticate);
+  if (config.authenticate) {
+    initializeAuthentication(config.authenticate);
+  }
 }
 
 function initializeAuthentication(authenticate: (username: string, password: string) => Promise<true | string>) {
@@ -143,7 +154,9 @@ function initializeAuthentication(authenticate: (username: string, password: str
     new passportLocal.Strategy(async function (username, password, done) {
       logger.info(`Authenticating`);
       const result = await authenticate(username, password);
-      if (result === true) return done(null, { username });
+      if (result === true) {
+        return done(null, { username });
+      }
 
       return done(new Error(result));
     })
@@ -174,11 +187,15 @@ function beforeRequest(server: express.Express, config: ServerConfig) {
     });
   }
 
-  if (config.request?.beforeRequest) server.use(config.request.beforeRequest);
+  if (config.request?.beforeRequest) {
+    server.use(config.request.beforeRequest);
+  }
 }
 
 function afterRequest(server: express.Express, config: ServerConfig) {
-  if (config.request?.afterRequest) server.use(config.request.afterRequest);
+  if (config.request?.afterRequest) {
+    server.use(config.request.afterRequest);
+  }
 
   if (config.request?.disableRequestLogging == false || typeof config.request?.disableRequestLogging === 'undefined') {
     server.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
@@ -196,7 +213,9 @@ function afterRequest(server: express.Express, config: ServerConfig) {
 function start(server: express.Express, config: ServerConfig) {
   const port = config.port ? config.port : 3000;
   server.listen(port, () => {
-    if (process.env.DEVELOPMENT) logger.info(`Starting in development mode`);
+    if (process.env.DEVELOPMENT) {
+      logger.info(`Starting in development mode`);
+    }
 
     logger.info(`Server listening on port: ${port}`);
   });

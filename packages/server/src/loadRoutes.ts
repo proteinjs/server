@@ -38,7 +38,9 @@ export function loadRoutes(routes: Route[], server: express.Express, config: Ser
     );
   }
 
-  if (starRoute) server[starRoute.method](starRoute.path, wrapRoute(starRoute.onRequest.bind(starRoute), config));
+  if (starRoute) {
+    server[starRoute.method](starRoute.path, wrapRoute(starRoute.onRequest.bind(starRoute), config));
+  }
 }
 
 export function loadDefaultStarRoute(routes: Route[], server: express.Express, config: ServerConfig) {
@@ -73,7 +75,9 @@ function wrapRoute(
     if (config.authenticate) {
       await new Promise<void>((resolve, reject) => {
         passport.authenticate('local', function (err, user, info) {
-          if (err) reject(err);
+          if (err) {
+            reject(err);
+          }
 
           resolve();
         })(request, response, next);
@@ -81,13 +85,16 @@ function wrapRoute(
     }
 
     const sessionData: SessionData = { sessionId: request.sessionID, user: request.user as string, data: {} };
-    for (const sessionDataCache of getSessionDataCaches())
+    for (const sessionDataCache of getSessionDataCaches()) {
       sessionData.data[sessionDataCache.key] = await sessionDataCache.create(sessionData.sessionId, sessionData.user);
+    }
     Session.setData(sessionData);
 
     const requestListeners = getRequestListeners();
     for (const listener of requestListeners) {
-      if (!listener.beforeRequest) continue;
+      if (!listener.beforeRequest) {
+        continue;
+      }
 
       try {
         await listener.beforeRequest(request, response);
@@ -99,9 +106,11 @@ function wrapRoute(
     const sixtyMinutes = 1000 * 60 * 60;
     const timeout = typeof config.request?.timeoutMs !== 'undefined' ? config.request.timeoutMs : sixtyMinutes;
     request.setTimeout(timeout, () => {
-      if (response.locals.requestNumber)
+      if (response.locals.requestNumber) {
         logger.warn(`[#${response.locals.requestNumber}] Timed out ${request.originalUrl}`);
-      else logger.warn(`Timed out ${request.originalUrl}`);
+      } else {
+        logger.warn(`Timed out ${request.originalUrl}`);
+      }
     });
 
     try {
@@ -112,7 +121,9 @@ function wrapRoute(
     response.locals['responseHandled'] = true;
 
     for (const listener of requestListeners) {
-      if (!listener.afterRequest) continue;
+      if (!listener.afterRequest) {
+        continue;
+      }
 
       try {
         await listener.afterRequest(request, response);
@@ -128,7 +139,9 @@ function wrapRoute(
 function basicAuthCredentials(request: express.Request): { username: string; password: string } | null {
   const b64auth = (request.headers.authorization || '').split(' ')[1] || '';
   const [username, password] = Buffer.from(b64auth, 'base64').toString().split(':');
-  if (!username || !password) return null;
+  if (!username || !password) {
+    return null;
+  }
 
   return { username, password };
 }

@@ -8,10 +8,13 @@ export const createReactApp = (serverConfig: ServerConfig) => {
     path: '*',
     method: 'get' as const,
     onRequest: async (request: any, response: any): Promise<void> => {
-      if (request.path.startsWith('/static')) return;
+      if (request.path.startsWith('/static')) {
+        return;
+      }
 
-      if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir))
+      if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir)) {
         throw new Error(`ServerConfig.bundlePath or ServerConfig.bundlesDir must be provided to serve a react app`);
+      }
 
       const helmet = ReactHelmet.renderStatic();
       response.send(`<!DOCTYPE html>
@@ -36,12 +39,15 @@ export const createReactApp = (serverConfig: ServerConfig) => {
 };
 
 async function bundleScriptTags(serverConfig: ServerConfig) {
-  if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir)) return;
+  if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir)) {
+    return;
+  }
 
   const scriptTags: string[] = [];
   if (serverConfig.staticContent?.bundlePaths) {
-    for (const bundlePath of serverConfig.staticContent.bundlePaths)
+    for (const bundlePath of serverConfig.staticContent.bundlePaths) {
       scriptTags.push(`<script src='${path.join('/static/', bundlePath)}'></script>`);
+    }
   } else if (serverConfig.staticContent?.bundlesDir && serverConfig.staticContent?.staticContentDir) {
     const resolvedBundlesDir = path.join(
       serverConfig.staticContent.staticContentDir,
@@ -60,7 +66,9 @@ async function bundleScriptTags(serverConfig: ServerConfig) {
 async function serverRenderedScriptTags() {
   const scripts = getServerRenderedScripts();
   const scriptTags: string[] = [];
-  for (const script of scripts) scriptTags.push(`<script>${await script.script()}</script>`);
+  for (const script of scripts) {
+    scriptTags.push(`<script>${await script.script()}</script>`);
+  }
 
   return scriptTags.join('\n');
 }
