@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.3](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.1.2...@proteinjs/server-api@1.1.3) (2024-05-10)
+
+
+### Bug Fixes
+
+* add .md file type to lint ignore files ([38899a8](https://github.com/brentbahry/server/commit/38899a83c80b3d6dc61049dc48916168985acf87))
+
+
+
+
+
 ## [1.1.2](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.1.1...@proteinjs/server-api@1.1.2) (2024-05-10)
 
 
