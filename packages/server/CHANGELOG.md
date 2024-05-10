@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.3](https://github.com/proteinjs/server/compare/@proteinjs/server@1.1.2...@proteinjs/server@1.1.3) (2024-05-10)
+
+
+### Bug Fixes
+
+* add linting and lint all files ([2b4e1e6](https://github.com/proteinjs/server/commit/2b4e1e6332e16328c3a3d3c846def74f819bbf39))
+
+
+
+
+
 # [1.1.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.0.17...@proteinjs/server@1.1.0) (2024-05-06)
 
 ### Features

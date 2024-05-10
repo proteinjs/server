@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.2](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.1.1...@proteinjs/server-api@1.1.2) (2024-05-10)
+
+
+### Bug Fixes
+
+* add linting and lint all files ([2b4e1e6](https://github.com/brentbahry/server/commit/2b4e1e6332e16328c3a3d3c846def74f819bbf39))
+
+
+
+
+
 # [1.1.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.0.8...@proteinjs/server-api@1.1.0) (2024-05-06)
 
 ### Features
