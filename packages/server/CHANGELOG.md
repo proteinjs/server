@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.6](https://github.com/proteinjs/server/compare/@proteinjs/server@1.1.5...@proteinjs/server@1.1.6) (2024-05-16)
+
+
+### Bug Fixes
+
+* `reactApp` adds hot client build bundle names explicitly as script tags when hot client builds are enabled ([a585f90](https://github.com/proteinjs/server/commit/a585f9040587dae550c76c24827dfefc4af55127))
+
+
+
+
+
 ## [1.1.4](https://github.com/proteinjs/server/compare/@proteinjs/server@1.1.3...@proteinjs/server@1.1.4) (2024-05-10)
 
 
