@@ -1,6 +1,6 @@
 {
   "name": "@proteinjs/server",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "A server impl",
   "publishConfig": {
     "access": "public"
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "0.5.11",
-    "@proteinjs/db": "1.0.18",
+    "@proteinjs/db": "1.0.19",
     "@proteinjs/reflection": "1.1.5",
     "@proteinjs/server-api": "^1.1.5",
     "@proteinjs/util": "1.1.2",
