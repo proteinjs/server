@@ -44,7 +44,10 @@ async function bundleScriptTags(serverConfig: ServerConfig) {
   }
 
   const scriptTags: string[] = [];
-  if (serverConfig.staticContent?.bundlePaths) {
+  if (process.env.DEVELOPMENT && !process.env.DISABLE_HOT_CLIENT_BUILDS) {
+    scriptTags.push(`<script src='${path.join('/static/', 'app.js')}'></script>`);
+    scriptTags.push(`<script src='${path.join('/static/', 'vendor.js')}'></script>`);
+  } else if (serverConfig.staticContent?.bundlePaths) {
     for (const bundlePath of serverConfig.staticContent.bundlePaths) {
       scriptTags.push(`<script src='${path.join('/static/', bundlePath)}'></script>`);
     }
