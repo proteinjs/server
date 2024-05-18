@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.1](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.2.0...@proteinjs/server-api@1.2.1) (2024-05-18)
+
+
+### Bug Fixes
+
+* global getDataByKey using wrong object to get cache ([31d9c2a](https://github.com/brentbahry/server/commit/31d9c2ae4ffa6d4b12559a091e52c68482d3d4c6))
+
+
+
+
+
 # [1.2.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.1.5...@proteinjs/server-api@1.2.0) (2024-05-18)
 
 
