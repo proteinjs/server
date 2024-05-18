@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.1.5...@proteinjs/server-api@1.2.0) (2024-05-18)
+
+
+### Features
+
+* create global data storage and cache ([52725b5](https://github.com/brentbahry/server/commit/52725b52820ae51022ef5a8132e44104e63193a9))
+
+
+
+
+
 ## [1.1.5](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.1.4...@proteinjs/server-api@1.1.5) (2024-05-16)
 
 **Note:** Version bump only for package @proteinjs/server-api
