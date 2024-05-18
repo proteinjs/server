@@ -41,10 +41,10 @@ export class Global {
       return undefined;
     }
 
-    return globalData.data[globalDataCacheKey];
+    return globalData[globalDataCacheKey];
   }
 
   static setDataByKey<T>(globalDataCacheKey: string, data: T) {
-    Global.getData().data[globalDataCacheKey] = data;
+    Global.getData()[globalDataCacheKey] = data;
   }
 }
