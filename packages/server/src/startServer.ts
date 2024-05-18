@@ -9,7 +9,7 @@ import webpack from 'webpack';
 import webpackDevMiddleware from 'webpack-dev-middleware';
 import webpackHotMiddleware from 'webpack-hot-middleware';
 import { Db } from '@proteinjs/db';
-import { ServerConfig, getRoutes } from '@proteinjs/server-api';
+import { Global, GlobalData, ServerConfig, getGlobalDataCaches, getRoutes } from '@proteinjs/server-api';
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { Logger } from '@proteinjs/util';
 import { setNodeModulesPath } from './nodeModulesPath';
@@ -37,6 +37,13 @@ export async function startServer(config: ServerConfig) {
     server,
     config
   );
+
+  const globalData: GlobalData = {};
+  for (const globalDataCache of getGlobalDataCaches()) {
+    globalData[globalDataCache.key] = await globalDataCache.create();
+  }
+  Global.setData(globalData);
+
   loadDefaultStarRoute(routes, server, config);
   afterRequest(server, config);
   start(server, config);

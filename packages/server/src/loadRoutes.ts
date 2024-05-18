@@ -7,6 +7,9 @@ import {
   Session,
   SessionData,
   getSessionDataCaches,
+  Global,
+  GlobalData,
+  getGlobalDataCaches,
 } from '@proteinjs/server-api';
 import { createReactApp } from './routes/reactApp';
 import { Logger } from '@proteinjs/util';
