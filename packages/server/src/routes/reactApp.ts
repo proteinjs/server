@@ -2,7 +2,6 @@ import path from 'path';
 import ReactHelmet from 'react-helmet';
 import { ServerConfig, getServerRenderedScripts } from '@proteinjs/server-api';
 import { Fs } from '@proteinjs/util-node';
-import { Logger } from '@proteinjs/util';
 
 export const createReactApp = (serverConfig: ServerConfig) => {
   return {
@@ -68,12 +67,10 @@ async function bundleScriptTags(serverConfig: ServerConfig) {
 }
 
 async function serverRenderedScriptTags() {
-  const logger = new Logger('Server');
   const scripts = getServerRenderedScripts();
   const scriptTags: string[] = [];
   for (const script of scripts) {
     scriptTags.push(`<script>${await script.script()}</script>`);
-    logger.info(`Scripts: ${script}`);
   }
 
   return scriptTags.join('\n');
