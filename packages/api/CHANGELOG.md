@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.2.1...@proteinjs/server-api@1.3.0) (2024-05-25)
+
+
+### Features
+
+* add feature flag abstract class ([addc243](https://github.com/brentbahry/server/commit/addc243c5f0ea4b3191f5af609cf7b34a6a9f2d6))
+
+
+
+
+
 ## [1.2.1](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.2.0...@proteinjs/server-api@1.2.1) (2024-05-18)
 
 
