@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.2.6...@proteinjs/server@1.3.0) (2024-06-15)
+
+
+### Features
+
+* add css loader to webpack.config used in hot builds ([37ae9bd](https://github.com/proteinjs/server/commit/37ae9bdc99602b59aed8544cf7f3eb68cd3d29cd))
+
+
+
+
+
 ## [1.2.4](https://github.com/proteinjs/server/compare/@proteinjs/server@1.2.3...@proteinjs/server@1.2.4) (2024-05-25)
 
 **Note:** Version bump only for package @proteinjs/server
