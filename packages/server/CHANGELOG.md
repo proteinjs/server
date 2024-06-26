@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.4](https://github.com/proteinjs/server/compare/@proteinjs/server@1.3.3...@proteinjs/server@1.3.4) (2024-06-26)
+
+
+### Bug Fixes
+
+* add shim for `path` in webpack.config for hot builds ([1a0ec62](https://github.com/proteinjs/server/commit/1a0ec62c2bfb235979f251da851ca24908c916bd))
+
+
+
+
+
 # [1.3.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.2.6...@proteinjs/server@1.3.0) (2024-06-15)
 
 
