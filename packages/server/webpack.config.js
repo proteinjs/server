@@ -49,6 +49,7 @@ module.exports = {
       buffer: require.resolve('buffer/'),
       stream: require.resolve('stream-browserify'),
       'process/browser': require.resolve('process/browser'),
+      path: require.resolve('path-browserify'),
     },
   },
   // since this webpack.config is invoked via webpack-dev-middleware in the process of the consuming server package (not this package)
