@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.4.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.3.7...@proteinjs/server@1.4.0) (2024-07-06)
+
+
+### Features
+
+* resolve path for node modules react query ([70a75b2](https://github.com/proteinjs/server/commit/70a75b22130c5a81b120856006435461690748de))
+
+
+
+
+
 ## [1.3.4](https://github.com/proteinjs/server/compare/@proteinjs/server@1.3.3...@proteinjs/server@1.3.4) (2024-06-26)
 
 
