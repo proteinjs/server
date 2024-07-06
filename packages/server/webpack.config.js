@@ -39,6 +39,7 @@ module.exports = {
       '@mui/material': path.join(nodeModulesPath, '@mui/material'),
       '@mui/icons-material': path.join(nodeModulesPath, '@mui/icons-material'),
       'webpack-hot-middleware': path.join(nodeModulesPath, 'webpack-hot-middleware'),
+      'react-query': path.join(nodeModulesPath, 'react-query'),
     },
     // provide shims for node libraries for webpack >= 5
     fallback: {
