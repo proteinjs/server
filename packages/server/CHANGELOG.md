@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.5.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.4.5...@proteinjs/server@1.5.0) (2024-07-20)
+
+
+### Features
+
+* added support for Socket.IO ([77c29a4](https://github.com/proteinjs/server/commit/77c29a4ddfd190f50ee38a0f80e118700eb417e0))
+
+
+
+
+
 # [1.4.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.3.7...@proteinjs/server@1.4.0) (2024-07-06)
 
 
