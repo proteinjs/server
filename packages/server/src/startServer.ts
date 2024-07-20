@@ -8,33 +8,46 @@ import passportLocal from 'passport-local';
 import webpack from 'webpack';
 import webpackDevMiddleware from 'webpack-dev-middleware';
 import webpackHotMiddleware from 'webpack-hot-middleware';
+import { Server as HttpServer, IncomingMessage } from 'http';
+import { Socket, Server as SocketIOServer } from 'socket.io';
 import { Db } from '@proteinjs/db';
 import { Global, GlobalData, ServerConfig, getGlobalDataCaches, getRoutes } from '@proteinjs/server-api';
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { Logger } from '@proteinjs/util';
 import { setNodeModulesPath } from './nodeModulesPath';
 
+interface ExtendedIncomingMessage extends IncomingMessage {
+  sessionID?: string;
+  user?: string;
+}
+
+interface ExtendedSocket extends Socket {
+  request: ExtendedIncomingMessage;
+}
+
 const staticContentPath = '/static/';
 const logger = new Logger('Server');
+const app = express();
+const server = new HttpServer(app);
+export const io = new SocketIOServer(server);
 
 export async function startServer(config: ServerConfig) {
   const routes = getRoutes();
   await runStartupEvents(config);
-  const server = express();
-  configureRequests(server);
-  initializeHotReloading(server, config);
-  beforeRequest(server, config);
+  configureRequests(app);
+  initializeHotReloading(app, config);
+  beforeRequest(app, config);
   loadRoutes(
     routes.filter((route) => route.useHttp),
-    server,
+    app,
     config
   );
-  configureHttps(server); // registering here forces static content to be redirected to https
-  configureStaticContentRouter(server, config); // registering here prevents sessions from being created on static content requests
-  configureSession(server, config);
+  configureHttps(app); // registering here forces static content to be redirected to https
+  configureStaticContentRouter(app, config); // registering here prevents sessions from being created on static content requests
+  configureSession(app, config);
   loadRoutes(
     routes.filter((route) => !route.useHttp),
-    server,
+    app,
     config
   );
 
@@ -44,8 +57,9 @@ export async function startServer(config: ServerConfig) {
   }
   Global.setData(globalData);
 
-  loadDefaultStarRoute(routes, server, config);
-  afterRequest(server, config);
+  loadDefaultStarRoute(routes, app, config);
+  afterRequest(app, config);
+  initializeSocketIO(io, app);
   start(server, config);
 }
 
@@ -57,20 +71,20 @@ async function runStartupEvents(config: ServerConfig) {
   }
 }
 
-function configureRequests(server: express.Express) {
-  server.use(compression());
-  server.use(cookieParser());
-  server.use(bodyParser.json({ limit: '100mb' }));
-  server.use(
+function configureRequests(app: express.Express) {
+  app.use(compression());
+  app.use(cookieParser());
+  app.use(bodyParser.json({ limit: '100mb' }));
+  app.use(
     bodyParser.urlencoded({
       extended: true,
       limit: '100mb',
     })
   );
-  server.disable('x-powered-by');
+  app.disable('x-powered-by');
 }
 
-function initializeHotReloading(server: express.Express, config: ServerConfig) {
+function initializeHotReloading(app: express.Express, config: ServerConfig) {
   if (
     !process.env.DEVELOPMENT ||
     process.env.DISABLE_HOT_CLIENT_BUILDS ||
@@ -86,12 +100,12 @@ function initializeHotReloading(server: express.Express, config: ServerConfig) {
   wpConfig['output']['path'] = config.staticContent.staticContentDir;
   wpConfig['output']['publicPath'] = staticContentPath;
   const webpackCompiler = webpack(wpConfig);
-  server.use(
+  app.use(
     webpackDevMiddleware(webpackCompiler, {
       publicPath: staticContentPath,
     })
   );
-  server.use(webpackHotMiddleware(webpackCompiler));
+  app.use(webpackHotMiddleware(webpackCompiler));
 }
 
 function getWebpackConfig(config: ServerConfig) {
@@ -100,8 +114,8 @@ function getWebpackConfig(config: ServerConfig) {
   return webpackConfig;
 }
 
-function configureHttps(server: express.Express) {
-  server.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
+function configureHttps(app: express.Express) {
+  app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
     if (request.protocol == 'https' || response.headersSent || process.env.DEVELOPMENT) {
       next();
       return;
@@ -112,18 +126,18 @@ function configureHttps(server: express.Express) {
   });
 }
 
-function configureStaticContentRouter(server: express.Express, config: ServerConfig) {
+function configureStaticContentRouter(app: express.Express, config: ServerConfig) {
   if (!config.staticContent?.staticContentDir) {
     return;
   }
 
-  server.use(staticContentPath, express.static(config.staticContent.staticContentDir));
+  app.use(staticContentPath, express.static(config.staticContent.staticContentDir));
   logger.info(
     `Serving static content on path: ${staticContentPath}, serving from directory: ${config.staticContent.staticContentDir}`
   );
 }
 
-function configureSession(server: express.Express, config: ServerConfig) {
+function configureSession(app: express.Express, config: ServerConfig) {
   const sixtyDays = 1000 * 60 * 60 * 24 * 60;
   let sessionOptions: expressSession.SessionOptions = {
     secret: config.session.secret,
@@ -137,7 +151,7 @@ function configureSession(server: express.Express, config: ServerConfig) {
   };
 
   if (!process.env.DEVELOPMENT) {
-    server.set('trust proxy', 1);
+    app.set('trust proxy', 1);
     if (!sessionOptions.cookie) {
       sessionOptions.cookie = {};
     }
@@ -148,9 +162,12 @@ function configureSession(server: express.Express, config: ServerConfig) {
     sessionOptions = Object.assign(sessionOptions, config.session);
   }
 
-  server.use(expressSession(sessionOptions));
-  server.use(passport.initialize());
-  server.use(passport.session());
+  const sessionMiddleware = expressSession(sessionOptions);
+  app.use(sessionMiddleware);
+  app.use(passport.initialize());
+  app.use(passport.session());
+  app.set('sessionMiddleware', sessionMiddleware); // Store the session middleware in the app for later use
+
   if (config.authenticate) {
     initializeAuthentication(config.authenticate);
   }
@@ -178,10 +195,10 @@ function initializeAuthentication(authenticate: (username: string, password: str
   });
 }
 
-function beforeRequest(server: express.Express, config: ServerConfig) {
+function beforeRequest(app: express.Express, config: ServerConfig) {
   let requestCounter: number = 0;
   if (config.request?.disableRequestLogging == false || typeof config.request?.disableRequestLogging === 'undefined') {
-    server.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
+    app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
       if (request.path.startsWith('/static') || request.path.startsWith('/favicon.ico')) {
         next();
         return;
@@ -195,17 +212,17 @@ function beforeRequest(server: express.Express, config: ServerConfig) {
   }
 
   if (config.request?.beforeRequest) {
-    server.use(config.request.beforeRequest);
+    app.use(config.request.beforeRequest);
   }
 }
 
-function afterRequest(server: express.Express, config: ServerConfig) {
+function afterRequest(app: express.Express, config: ServerConfig) {
   if (config.request?.afterRequest) {
-    server.use(config.request.afterRequest);
+    app.use(config.request.afterRequest);
   }
 
   if (config.request?.disableRequestLogging == false || typeof config.request?.disableRequestLogging === 'undefined') {
-    server.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
+    app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
       if (request.path.startsWith('/static') || request.path.startsWith('/favicon.ico')) {
         next();
         return;
@@ -217,7 +234,56 @@ function afterRequest(server: express.Express, config: ServerConfig) {
   }
 }
 
-function start(server: express.Express, config: ServerConfig) {
+function initializeSocketIO(io: SocketIOServer, app: express.Express) {
+  const logger = new Logger('SocketIOServer');
+
+  // Share session and passport middleware with Socket.IO
+  const wrapMiddleware = (middleware: any) => (socket: any, next: any) => middleware(socket.request, {}, next);
+  const sessionMiddleware = app.get('sessionMiddleware');
+  io.use(wrapMiddleware(sessionMiddleware));
+  io.use(wrapMiddleware(passport.initialize()));
+  io.use(wrapMiddleware(passport.session()));
+
+  // Use passport for authentication with Socket.IO
+  io.use((socket: ExtendedSocket, next) => {
+    if (socket.request.user) {
+      next();
+    } else {
+      next(new Error('Unauthorized'));
+    }
+  });
+
+  // Initialize Socket.IO event handlers
+  io.on('connection', (socket: ExtendedSocket) => {
+    const userInfo = `${socket.request.user} (${socket.id})`;
+    logger.info(`User connected: ${userInfo}`);
+
+    // Map this socket to the session id so it can be closed when the session is destroyed
+    const sessionId = socket.request.sessionID;
+    if (sessionId) {
+      socket.join(sessionId);
+    }
+
+    socket.on('disconnect', (reason) => {
+      logger.info(`User disconnected: ${userInfo}. Reason: ${reason}`);
+    });
+
+    socket.on('error', (error) => {
+      logger.error(`Socket error for user: ${userInfo}. Error:`, error);
+    });
+
+    socket.conn.on('error', (error) => {
+      logger.error(`Socket connection error for user: ${userInfo}. Error:`, error);
+    });
+  });
+
+  // Handle server-level errors
+  io.engine.on('connection_error', (err) => {
+    logger.error('Connection error:', err);
+  });
+}
+
+function start(server: HttpServer, config: ServerConfig) {
   const port = config.port ? config.port : 3000;
   server.listen(port, () => {
     if (process.env.DEVELOPMENT) {
