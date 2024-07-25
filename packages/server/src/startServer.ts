@@ -1,6 +1,5 @@
 import express from 'express';
 import expressSession from 'express-session';
-import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import passport from 'passport';
@@ -72,7 +71,6 @@ async function runStartupEvents(config: ServerConfig) {
 }
 
 function configureRequests(app: express.Express) {
-  app.use(compression());
   app.use(cookieParser());
   app.use(bodyParser.json({ limit: '100mb' }));
   app.use(
