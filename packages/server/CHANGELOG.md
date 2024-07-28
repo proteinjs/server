@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.2](https://github.com/proteinjs/server/compare/@proteinjs/server@1.5.1...@proteinjs/server@1.5.2) (2024-07-28)
+
+
+### Bug Fixes
+
+* no longer compress responses by default; compression should be handled explicitly within services/routes when needed. ([a33f5fb](https://github.com/proteinjs/server/commit/a33f5fb537943424f71072cf5f93d1edaa2c610c))
+
+
+
+
+
 # [1.5.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.4.5...@proteinjs/server@1.5.0) (2024-07-20)
 
 
