@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.4.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.3.5...@proteinjs/server-api@1.4.0) (2024-08-02)
+
+
+### Features
+
+* added `StartupTask` ([d66616a](https://github.com/brentbahry/server/commit/d66616a2696c001c8ebef6828d319af6aeba245c))
+
+
+
+
+
 ## [1.3.5](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.3.4...@proteinjs/server-api@1.3.5) (2024-07-20)
 
 **Note:** Version bump only for package @proteinjs/server-api

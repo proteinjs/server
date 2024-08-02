@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.6.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.5.3...@proteinjs/server@1.6.0) (2024-08-02)
+
+
+### Features
+
+* added `StartupTask` ([d66616a](https://github.com/proteinjs/server/commit/d66616a2696c001c8ebef6828d319af6aeba245c))
+
+
+
+
+
 ## [1.5.2](https://github.com/proteinjs/server/compare/@proteinjs/server@1.5.1...@proteinjs/server@1.5.2) (2024-07-28)
 
 
