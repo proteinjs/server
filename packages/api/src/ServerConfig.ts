@@ -4,6 +4,12 @@ import expressSession from 'express-session';
 type MakeMandatory<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
 
 export interface ServerConfig {
+  /**
+   * Runs:
+   *   - after server config
+   *   - after `after server config` startup tasks
+   *   - before server start
+   */
   onStartup?: () => Promise<void>;
   session: MakeMandatory<expressSession.SessionOptions, 'secret' | 'store'>;
   authenticate?: (username: string, password: string) => Promise<true | string>;

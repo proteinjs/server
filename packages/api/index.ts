@@ -10,3 +10,4 @@ export * from './src/EnvInfo';
 export * from './src/EnvRepo';
 export * from './src/FeatureFlag';
 export * from './src/ServerRenderedScript';
+export * from './src/StartupTask';

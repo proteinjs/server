@@ -9,8 +9,15 @@ import webpackDevMiddleware from 'webpack-dev-middleware';
 import webpackHotMiddleware from 'webpack-hot-middleware';
 import { Server as HttpServer, IncomingMessage } from 'http';
 import { Socket, Server as SocketIOServer } from 'socket.io';
-import { Db } from '@proteinjs/db';
-import { Global, GlobalData, ServerConfig, getGlobalDataCaches, getRoutes } from '@proteinjs/server-api';
+import {
+  Global,
+  GlobalData,
+  ServerConfig,
+  StartupTask,
+  getGlobalDataCaches,
+  getRoutes,
+  getStartupTasks,
+} from '@proteinjs/server-api';
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { Logger } from '@proteinjs/util';
 import { setNodeModulesPath } from './nodeModulesPath';
@@ -31,8 +38,8 @@ const server = new HttpServer(app);
 export const io = new SocketIOServer(server);
 
 export async function startServer(config: ServerConfig) {
+  await runStartupTasks('before server config');
   const routes = getRoutes();
-  await runStartupEvents(config);
   configureRequests(app);
   initializeHotReloading(app, config);
   beforeRequest(app, config);
@@ -59,15 +66,34 @@ export async function startServer(config: ServerConfig) {
   loadDefaultStarRoute(routes, app, config);
   afterRequest(app, config);
   initializeSocketIO(io, app);
+
+  await runStartupTasks('after server config');
+  if (config.onStartup) {
+    logger.info(`Starting ServerConfig.onStartup`);
+    await config.onStartup();
+    logger.info(`Finished ServerConfig.onStartup`);
+  }
+
   start(server, config);
+
+  await runStartupTasks('after server start');
 }
 
-async function runStartupEvents(config: ServerConfig) {
-  await new Db().init();
-
-  if (config.onStartup) {
-    await config.onStartup();
+async function runStartupTasks(when: StartupTask['when']) {
+  const filteredTasks = getStartupTasks().filter((task) => task.when === when);
+  if (filteredTasks.length === 0) {
+    return;
   }
+
+  logger.info(`Starting ${filteredTasks.length} \`${when}\` startup task${filteredTasks.length > 1 ? 's' : ''}`);
+  await Promise.all(
+    filteredTasks.map(async (task) => {
+      logger.info(`Starting task: ${task.name}`);
+      await task.run();
+      logger.info(`Finished task: ${task.name}`);
+    })
+  );
+  logger.info(`Finished ${filteredTasks.length} \`${when}\` startup task${filteredTasks.length > 1 ? 's' : ''}`);
 }
 
 function configureRequests(app: express.Express) {
