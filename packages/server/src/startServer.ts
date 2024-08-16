@@ -19,7 +19,7 @@ import {
   getStartupTasks,
 } from '@proteinjs/server-api';
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
-import { Logger } from '@proteinjs/util';
+import { Logger } from '@proteinjs/logger';
 import { setNodeModulesPath } from './nodeModulesPath';
 
 interface ExtendedIncomingMessage extends IncomingMessage {
@@ -32,7 +32,7 @@ interface ExtendedSocket extends Socket {
 }
 
 const staticContentPath = '/static/';
-const logger = new Logger('Server');
+const logger = new Logger({ name: 'Server' });
 const app = express();
 const server = new HttpServer(app);
 export const io = new SocketIOServer(server);
@@ -42,6 +42,7 @@ export async function startServer(config: ServerConfig) {
   const routes = getRoutes();
   configureRequests(app);
   initializeHotReloading(app, config);
+  configureSession(app, config);
   beforeRequest(app, config);
   loadRoutes(
     routes.filter((route) => route.useHttp),
@@ -49,8 +50,7 @@ export async function startServer(config: ServerConfig) {
     config
   );
   configureHttps(app); // registering here forces static content to be redirected to https
-  configureStaticContentRouter(app, config); // registering here prevents sessions from being created on static content requests
-  configureSession(app, config);
+  configureStaticContentRouter(app, config);
   loadRoutes(
     routes.filter((route) => !route.useHttp),
     app,
@@ -69,9 +69,9 @@ export async function startServer(config: ServerConfig) {
 
   await runStartupTasks('after server config');
   if (config.onStartup) {
-    logger.info(`Starting ServerConfig.onStartup`);
+    logger.info({ message: `Starting ServerConfig.onStartup` });
     await config.onStartup();
-    logger.info(`Finished ServerConfig.onStartup`);
+    logger.info({ message: `Finished ServerConfig.onStartup` });
   }
 
   start(server, config);
@@ -85,15 +85,19 @@ async function runStartupTasks(when: StartupTask['when']) {
     return;
   }
 
-  logger.info(`Starting ${filteredTasks.length} \`${when}\` startup task${filteredTasks.length > 1 ? 's' : ''}`);
+  logger.info({
+    message: `Starting ${filteredTasks.length} \`${when}\` startup task${filteredTasks.length > 1 ? 's' : ''}`,
+  });
   await Promise.all(
     filteredTasks.map(async (task) => {
-      logger.info(`Starting task: ${task.name}`);
+      logger.info({ message: `Starting task: ${task.name}` });
       await task.run();
-      logger.info(`Finished task: ${task.name}`);
+      logger.info({ message: `Finished task: ${task.name}` });
     })
   );
-  logger.info(`Finished ${filteredTasks.length} \`${when}\` startup task${filteredTasks.length > 1 ? 's' : ''}`);
+  logger.info({
+    message: `Finished ${filteredTasks.length} \`${when}\` startup task${filteredTasks.length > 1 ? 's' : ''}`,
+  });
 }
 
 function configureRequests(app: express.Express) {
@@ -145,7 +149,7 @@ function configureHttps(app: express.Express) {
       return;
     }
 
-    logger.debug(`Redirecting to https: ${request.headers.host + request.url}`);
+    logger.debug({ message: `Redirecting to https: ${request.headers.host + request.url}` });
     response.redirect('https://' + request.headers.host + request.url);
   });
 }
@@ -156,9 +160,9 @@ function configureStaticContentRouter(app: express.Express, config: ServerConfig
   }
 
   app.use(staticContentPath, express.static(config.staticContent.staticContentDir));
-  logger.info(
-    `Serving static content on path: ${staticContentPath}, serving from directory: ${config.staticContent.staticContentDir}`
-  );
+  logger.info({
+    message: `Serving static content on path: ${staticContentPath}, serving from directory: ${config.staticContent.staticContentDir}`,
+  });
 }
 
 function configureSession(app: express.Express, config: ServerConfig) {
@@ -200,7 +204,7 @@ function configureSession(app: express.Express, config: ServerConfig) {
 function initializeAuthentication(authenticate: (username: string, password: string) => Promise<true | string>) {
   passport.use(
     new passportLocal.Strategy(async function (username, password, done) {
-      logger.info(`Authenticating`);
+      logger.info({ message: `Authenticating` });
       const result = await authenticate(username, password);
       if (result === true) {
         return done(null, { username });
@@ -220,17 +224,19 @@ function initializeAuthentication(authenticate: (username: string, password: str
 }
 
 function beforeRequest(app: express.Express, config: ServerConfig) {
-  let requestCounter: number = 0;
   if (config.request?.disableRequestLogging == false || typeof config.request?.disableRequestLogging === 'undefined') {
-    app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
-      if (request.path.startsWith('/static') || request.path.startsWith('/favicon.ico')) {
-        next();
-        return;
-      }
+    app.use(async (request: express.Request, response: express.Response, next: express.NextFunction) => {
+      if (config.authenticate) {
+        await new Promise<void>((resolve, reject) => {
+          passport.authenticate('local', function (err, user, info) {
+            if (err) {
+              reject(err);
+            }
 
-      const requestNumber = ++requestCounter;
-      logger.info(`[#${requestNumber}] Started ${request.originalUrl}`);
-      response.locals = { requestNumber };
+            resolve();
+          })(request, response, next);
+        });
+      }
       next();
     });
   }
@@ -244,22 +250,10 @@ function afterRequest(app: express.Express, config: ServerConfig) {
   if (config.request?.afterRequest) {
     app.use(config.request.afterRequest);
   }
-
-  if (config.request?.disableRequestLogging == false || typeof config.request?.disableRequestLogging === 'undefined') {
-    app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
-      if (request.path.startsWith('/static') || request.path.startsWith('/favicon.ico')) {
-        next();
-        return;
-      }
-
-      logger.info(`[#${response.locals.requestNumber}] Finished ${request.originalUrl}`);
-      next();
-    });
-  }
 }
 
 function initializeSocketIO(io: SocketIOServer, app: express.Express) {
-  const logger = new Logger('SocketIOServer');
+  const socketLogger = new Logger({ name: 'SocketIOServer' });
 
   // Share session and passport middleware with Socket.IO
   const wrapMiddleware = (middleware: any) => (socket: any, next: any) => middleware(socket.request, {}, next);
@@ -280,7 +274,7 @@ function initializeSocketIO(io: SocketIOServer, app: express.Express) {
   // Initialize Socket.IO event handlers
   io.on('connection', (socket: ExtendedSocket) => {
     const userInfo = `${socket.request.user} (${socket.id})`;
-    logger.info(`User connected: ${userInfo}`);
+    socketLogger.info({ message: `User connected: ${userInfo}` });
 
     // Map this socket to the session id so it can be closed when the session is destroyed
     const sessionId = socket.request.sessionID;
@@ -289,21 +283,21 @@ function initializeSocketIO(io: SocketIOServer, app: express.Express) {
     }
 
     socket.on('disconnect', (reason) => {
-      logger.info(`User disconnected: ${userInfo}. Reason: ${reason}`);
+      socketLogger.info({ message: `User disconnected: ${userInfo}. Reason: ${reason}` });
     });
 
     socket.on('error', (error) => {
-      logger.error(`Socket error for user: ${userInfo}. Error:`, error);
+      socketLogger.error({ message: `Socket error for user: ${userInfo}`, error });
     });
 
     socket.conn.on('error', (error) => {
-      logger.error(`Socket connection error for user: ${userInfo}. Error:`, error);
+      socketLogger.error({ message: `Socket connection error for user: ${userInfo}`, error });
     });
   });
 
   // Handle server-level errors
-  io.engine.on('connection_error', (err) => {
-    logger.error('Connection error:', err);
+  io.engine.on('connection_error', (error) => {
+    socketLogger.error({ message: 'Connection error', error });
   });
 }
 
@@ -311,9 +305,9 @@ function start(server: HttpServer, config: ServerConfig) {
   const port = config.port ? config.port : 3000;
   server.listen(port, () => {
     if (process.env.DEVELOPMENT) {
-      logger.info(`Starting in development mode`);
+      logger.info({ message: `Starting in development mode` });
     }
 
-    logger.info(`Server listening on port: ${port}`);
+    logger.info({ message: `Server listening on port: ${port}` });
   });
 }
