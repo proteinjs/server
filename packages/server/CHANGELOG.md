@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.7.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.6.1...@proteinjs/server@1.7.0) (2024-08-16)
+
+
+### Features
+
+* added `Request` to track request metadata in an async_hook ([c87cb0a](https://github.com/proteinjs/server/commit/c87cb0aaf1da85f36ca560e8e2c5e062bb98bf1c))
+
+
+
+
+
 # [1.6.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.5.3...@proteinjs/server@1.6.0) (2024-08-02)
 
 

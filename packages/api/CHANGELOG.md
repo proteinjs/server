@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.2](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.4.1...@proteinjs/server-api@1.4.2) (2024-08-16)
+
+**Note:** Version bump only for package @proteinjs/server-api
+
+
+
+
+
 # [1.4.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.3.5...@proteinjs/server-api@1.4.0) (2024-08-02)
 
 
