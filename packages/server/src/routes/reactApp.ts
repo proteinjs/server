@@ -22,7 +22,7 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                     <head>
                         <meta charset='utf-8' />
                         <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-                        <link href='${serverConfig.staticContent?.faviconPath ? path.join('/static/', serverConfig.staticContent.faviconPath) : ''}' rel='icon' type='image/x-icon' />
+                        <link href='${serverConfig.staticContent?.faviconPath ? path.join('/static/', serverConfig.staticContent.faviconPath) : ''}' rel='icon' type='image/png' />
                         ${helmet.title.toString()}
                         ${helmet.meta.toString()}
                         ${helmet.link.toString()}
