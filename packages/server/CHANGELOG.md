@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.2](https://github.com/proteinjs/server/compare/@proteinjs/server@1.7.1...@proteinjs/server@1.7.2) (2024-08-18)
+
+
+### Bug Fixes
+
+* use different file type for favicon ([2897442](https://github.com/proteinjs/server/commit/28974421fc89def80062f60b4a3f58bbedc0dda3))
+
+
+
+
+
 # [1.7.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.6.1...@proteinjs/server@1.7.0) (2024-08-16)
 
 
