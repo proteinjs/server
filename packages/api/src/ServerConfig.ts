@@ -1,5 +1,6 @@
 import express from 'express';
 import expressSession from 'express-session';
+import serveStatic = require('serve-static');
 
 type MakeMandatory<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
 
@@ -15,6 +16,7 @@ export interface ServerConfig {
   authenticate?: (username: string, password: string) => Promise<true | string>;
   staticContent?: {
     staticContentDir?: string;
+    staticOptions?: serveStatic.ServeStaticOptions;
     /** @deprecated use bundlesDir instead */
     bundlePaths?: string[];
     /** Dir containing bundles; relative from `staticContentDir`. */

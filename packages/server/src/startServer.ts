@@ -159,7 +159,7 @@ function configureStaticContentRouter(app: express.Express, config: ServerConfig
     return;
   }
 
-  app.use(staticContentPath, express.static(config.staticContent.staticContentDir));
+  app.use(staticContentPath, express.static(config.staticContent.staticContentDir, config.staticContent.staticOptions));
   logger.info({
     message: `Serving static content on path: ${staticContentPath}, serving from directory: ${config.staticContent.staticContentDir}`,
   });
