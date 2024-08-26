@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.5.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.4.3...@proteinjs/server-api@1.5.0) (2024-08-26)
+
+
+### Features
+
+* add static options to server config ([d00ef75](https://github.com/brentbahry/server/commit/d00ef753af82cdca466d6bf8b273633283a7a20a))
+
+
+
+
+
 ## [1.4.2](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.4.1...@proteinjs/server-api@1.4.2) (2024-08-16)
 
 **Note:** Version bump only for package @proteinjs/server-api

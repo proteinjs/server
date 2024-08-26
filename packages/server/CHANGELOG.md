@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.7.2...@proteinjs/server@1.8.0) (2024-08-26)
+
+
+### Features
+
+* add static options to server config ([d00ef75](https://github.com/proteinjs/server/commit/d00ef753af82cdca466d6bf8b273633283a7a20a))
+
+
+
+
+
 ## [1.7.2](https://github.com/proteinjs/server/compare/@proteinjs/server@1.7.1...@proteinjs/server@1.7.2) (2024-08-18)
 
 
