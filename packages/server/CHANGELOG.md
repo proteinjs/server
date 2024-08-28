@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.2](https://github.com/proteinjs/server/compare/@proteinjs/server@1.8.1...@proteinjs/server@1.8.2) (2024-08-28)
+
+
+### Bug Fixes
+
+* stripping down socketio `connection_error` logging some more ([e4f29ee](https://github.com/proteinjs/server/commit/e4f29ee14b293474ae57e189e29dae452ad87a03))
+
+
+
+
+
 # [1.8.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.7.2...@proteinjs/server@1.8.0) (2024-08-26)
 
 
