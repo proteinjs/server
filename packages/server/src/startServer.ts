@@ -299,7 +299,7 @@ function initializeSocketIO(io: SocketIOServer, app: express.Express) {
   io.engine.on('connection_error', (error) => {
     socketLogger.error({
       message: 'Connection error',
-      error: { message: error.message, code: error.code, context: error.context, request: error.req },
+      error: { message: error.message, code: error.code, context: error.context },
     });
   });
 }
