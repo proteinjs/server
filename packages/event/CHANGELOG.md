@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 1.0.1 (2024-08-29)
+
+**Note:** Version bump only for package @proteinjs/event
+
+
+
+
+
 # [1.5.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.4.3...@proteinjs/server-api@1.5.0) (2024-08-26)
 
 
