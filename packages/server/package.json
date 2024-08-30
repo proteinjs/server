@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "0.5.11",
+    "@proteinjs/event": "1.0.1",
     "@proteinjs/logger": "1.0.6",
     "@proteinjs/reflection": "1.1.9",
     "@proteinjs/server-api": "^1.5.0",

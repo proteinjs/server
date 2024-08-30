@@ -7,8 +7,7 @@ import passportLocal from 'passport-local';
 import webpack from 'webpack';
 import webpackDevMiddleware from 'webpack-dev-middleware';
 import webpackHotMiddleware from 'webpack-hot-middleware';
-import { Server as HttpServer, IncomingMessage } from 'http';
-import { Socket, Server as SocketIOServer } from 'socket.io';
+import { Server as HttpServer } from 'http';
 import {
   Global,
   GlobalData,
@@ -21,21 +20,12 @@ import {
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { Logger } from '@proteinjs/logger';
 import { setNodeModulesPath } from './nodeModulesPath';
-
-interface ExtendedIncomingMessage extends IncomingMessage {
-  sessionID?: string;
-  user?: string;
-}
-
-interface ExtendedSocket extends Socket {
-  request: ExtendedIncomingMessage;
-}
+import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
 
 const staticContentPath = '/static/';
 const logger = new Logger({ name: 'Server' });
 const app = express();
 const server = new HttpServer(app);
-export const io = new SocketIOServer(server);
 
 export async function startServer(config: ServerConfig) {
   await runStartupTasks('before server config');
@@ -65,7 +55,7 @@ export async function startServer(config: ServerConfig) {
 
   loadDefaultStarRoute(routes, app, config);
   afterRequest(app, config);
-  initializeSocketIO(io, app);
+  initializeSocketIO(app, server);
 
   await runStartupTasks('after server config');
   if (config.onStartup) {
@@ -252,8 +242,8 @@ function afterRequest(app: express.Express, config: ServerConfig) {
   }
 }
 
-function initializeSocketIO(io: SocketIOServer, app: express.Express) {
-  const socketLogger = new Logger({ name: 'SocketIOServer' });
+function initializeSocketIO(app: express.Express, server: HttpServer) {
+  const io = SocketIOServerRepo.createSocketIOServer(server);
 
   // Share session and passport middleware with Socket.IO
   const wrapMiddleware = (middleware: any) => (socket: any, next: any) => middleware(socket.request, {}, next);
@@ -271,36 +261,12 @@ function initializeSocketIO(io: SocketIOServer, app: express.Express) {
     }
   });
 
-  // Initialize Socket.IO event handlers
+  // Map this socket to the session id so it can be closed when the session is destroyed
   io.on('connection', (socket: ExtendedSocket) => {
-    const userInfo = `${socket.request.user} (${socket.id})`;
-    socketLogger.info({ message: `User connected: ${userInfo}` });
-
-    // Map this socket to the session id so it can be closed when the session is destroyed
     const sessionId = socket.request.sessionID;
     if (sessionId) {
       socket.join(sessionId);
     }
-
-    socket.on('disconnect', (reason) => {
-      socketLogger.info({ message: `User disconnected: ${userInfo}. Reason: ${reason}` });
-    });
-
-    socket.on('error', (error) => {
-      socketLogger.error({ message: `Socket error for user: ${userInfo}`, error });
-    });
-
-    socket.conn.on('error', (error) => {
-      socketLogger.error({ message: `Socket connection error for user: ${userInfo}`, error });
-    });
-  });
-
-  // Handle server-level errors
-  io.engine.on('connection_error', (error) => {
-    socketLogger.error({
-      message: 'Connection error',
-      error: { message: error.message, code: error.code, context: error.context },
-    });
   });
 }
 
