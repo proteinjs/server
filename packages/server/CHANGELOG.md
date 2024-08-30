@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [2.0.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.8.2...@proteinjs/server@2.0.0) (2024-08-30)
+
+
+### Features
+
+* added `SocketIOServerRepo` to get access to the socket.io server. It enables the socket.io server to be provided by the app's server via `@proteinjs/event/DefaultSocketIOServerFactory`. ([88613af](https://github.com/proteinjs/server/commit/88613af3b8f149675f4b1547f5bbbd9e262e0c0b))
+
+
+### BREAKING CHANGES
+
+* we used to initialize the socket.io server in `startServer` and export as a const.
+
+
+
+
+
 ## [1.8.2](https://github.com/proteinjs/server/compare/@proteinjs/server@1.8.1...@proteinjs/server@1.8.2) (2024-08-28)
 
 
