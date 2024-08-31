@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.1](https://github.com/proteinjs/server/compare/@proteinjs/server@2.0.0...@proteinjs/server@2.0.1) (2024-08-31)
+
+
+### Bug Fixes
+
+* `DefaultSocketIOServerFactory.createSocketIOServer` and `SocketIOServerRepo.createSocketIOServer` to return a Promise ([19d947e](https://github.com/proteinjs/server/commit/19d947eef68d0957d8db1117d958acef05a42874))
+
+
+
+
+
 # [2.0.0](https://github.com/proteinjs/server/compare/@proteinjs/server@1.8.2...@proteinjs/server@2.0.0) (2024-08-30)
 
 

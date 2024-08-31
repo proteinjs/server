@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.2](https://github.com/brentbahry/server/compare/@proteinjs/event@1.0.1...@proteinjs/event@1.0.2) (2024-08-31)
+
+
+### Bug Fixes
+
+* `DefaultSocketIOServerFactory.createSocketIOServer` and `SocketIOServerRepo.createSocketIOServer` to return a Promise ([19d947e](https://github.com/brentbahry/server/commit/19d947eef68d0957d8db1117d958acef05a42874))
+
+
+
+
+
 ## 1.0.1 (2024-08-29)
 
 **Note:** Version bump only for package @proteinjs/event
