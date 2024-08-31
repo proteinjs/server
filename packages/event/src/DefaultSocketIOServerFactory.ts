@@ -6,5 +6,5 @@ export const getDefaultSocketIOServerFactory = () =>
   SourceRepository.get().object<DefaultSocketIOServerFactory>('@proteinjs/event/DefaultSocketIOServerFactory');
 
 export interface DefaultSocketIOServerFactory extends Loadable {
-  createSocketIOServer(httpServer: HttpServer): SocketIOServer;
+  createSocketIOServer(httpServer: HttpServer): Promise<SocketIOServer>;
 }

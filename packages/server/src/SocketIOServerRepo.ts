@@ -20,14 +20,14 @@ export interface ExtendedSocket extends Socket {
 }
 
 export class SocketIOServerRepo {
-  static createSocketIOServer(httpServer: HttpServer): SocketIOServer {
+  static async createSocketIOServer(httpServer: HttpServer): Promise<SocketIOServer> {
     if (getGlobal().__proteinjs_server_SocketIOServer) {
       throw new Error('Socket IO Server already initialized');
     }
 
     const socketIOServerFactory = getDefaultSocketIOServerFactory();
     const socketIOServer = socketIOServerFactory
-      ? socketIOServerFactory.createSocketIOServer(httpServer)
+      ? await socketIOServerFactory.createSocketIOServer(httpServer)
       : new SocketIOServer(httpServer);
     getGlobal().__proteinjs_server_SocketIOServer = socketIOServer;
 

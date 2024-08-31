@@ -55,7 +55,7 @@ export async function startServer(config: ServerConfig) {
 
   loadDefaultStarRoute(routes, app, config);
   afterRequest(app, config);
-  initializeSocketIO(app, server);
+  await initializeSocketIO(app, server);
 
   await runStartupTasks('after server config');
   if (config.onStartup) {
@@ -242,8 +242,8 @@ function afterRequest(app: express.Express, config: ServerConfig) {
   }
 }
 
-function initializeSocketIO(app: express.Express, server: HttpServer) {
-  const io = SocketIOServerRepo.createSocketIOServer(server);
+async function initializeSocketIO(app: express.Express, server: HttpServer) {
+  const io = await SocketIOServerRepo.createSocketIOServer(server);
 
   // Share session and passport middleware with Socket.IO
   const wrapMiddleware = (middleware: any) => (socket: any, next: any) => middleware(socket.request, {}, next);
