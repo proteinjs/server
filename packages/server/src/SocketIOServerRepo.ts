@@ -43,4 +43,8 @@ export class SocketIOServerRepo {
 
     return getGlobal().__proteinjs_server_SocketIOServer;
   }
+
+  static getSocketIOServerIfExists(): SocketIOServer | undefined {
+    return getGlobal().__proteinjs_server_SocketIOServer;
+  }
 }
