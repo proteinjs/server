@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [2.1.0](https://github.com/proteinjs/server/compare/@proteinjs/server@2.0.1...@proteinjs/server@2.1.0) (2024-09-07)
+
+
+### Features
+
+* added `SocketIOServerRepo.getSocketIOServerIfExists` so the app can choose where and how it handles errors. useful for automated testing when you don't want events to send, but don't want errors to be thrown. ([861d092](https://github.com/proteinjs/server/commit/861d092011d17ddb4f8a8246c57ef2cec99966ac))
+
+
+
+
+
 ## [2.0.1](https://github.com/proteinjs/server/compare/@proteinjs/server@2.0.0...@proteinjs/server@2.0.1) (2024-08-31)
 
 
