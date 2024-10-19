@@ -40,6 +40,8 @@ module.exports = {
       '@mui/icons-material': path.join(nodeModulesPath, '@mui/icons-material'),
       'webpack-hot-middleware': path.join(nodeModulesPath, 'webpack-hot-middleware'),
       'react-query': path.join(nodeModulesPath, 'react-query'),
+      'react-router': path.join(nodeModulesPath, 'react-router'),
+      'react-router-dom': path.join(nodeModulesPath, 'react-router-dom'),
     },
     // provide shims for node libraries for webpack >= 5
     fallback: {
