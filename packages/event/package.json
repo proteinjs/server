@@ -1,6 +1,6 @@
 {
   "name": "@proteinjs/event",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Event api",
   "publishConfig": {
     "access": "public"
@@ -21,10 +21,10 @@
     "watch": "reflection-watch"
   },
   "dependencies": {
-    "@proteinjs/reflection": "1.1.9"
+    "@proteinjs/reflection": "1.1.10"
   },
   "devDependencies": {
-    "@proteinjs/reflection-build": "1.0.24",
+    "@proteinjs/reflection-build": "1.0.25",
     "@types/node": "20.8.2",
     "@typescript-eslint/eslint-plugin": "7.8.0",
     "@typescript-eslint/parser": "7.8.0",
