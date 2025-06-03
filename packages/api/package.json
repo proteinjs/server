@@ -1,6 +1,6 @@
 {
   "name": "@proteinjs/server-api",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Server apis only (server implementation in @proteinjs/server)",
   "publishConfig": {
     "access": "public"
@@ -24,7 +24,7 @@
     "@proteinjs/reflection": "1.1.10"
   },
   "devDependencies": {
-    "@proteinjs/reflection-build": "1.1.0",
+    "@proteinjs/reflection-build": "1.1.1",
     "@types/body-parser": "1.19.0",
     "@types/compression": "1.7.0",
     "@types/cookie-parser": "1.4.2",
