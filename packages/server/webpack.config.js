@@ -118,5 +118,14 @@ module.exports = {
     }),
     new webpack.HotModuleReplacementPlugin(),
     new ReactRefreshWebpackPlugin(),
+    new webpack.NormalModuleReplacementPlugin(/^node:process$/, (resource) => {
+      resource.request = 'process/browser';
+    }),
+    new webpack.NormalModuleReplacementPlugin(/^node:path$/, (resource) => {
+      resource.request = 'path';
+    }),
+    new webpack.NormalModuleReplacementPlugin(/^node:url$/, (resource) => {
+      resource.request = 'url';
+    }),
   ],
 };
