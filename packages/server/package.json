@@ -1,6 +1,6 @@
 {
   "name": "@proteinjs/server",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "description": "A server impl",
   "publishConfig": {
     "access": "public"

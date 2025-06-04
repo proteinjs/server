@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.6](https://github.com/proteinjs/server/compare/@proteinjs/server@2.1.5...@proteinjs/server@2.1.6) (2025-06-04)
+
+
+### Bug Fixes
+
+* Alias `node:process`, `node:path`, `node:url` in hot builds ([047e6c6](https://github.com/proteinjs/server/commit/047e6c6d043687513467eccb38d8bbefbddfd3b5))
+
+
+
+
+
 ## [2.1.1](https://github.com/proteinjs/server/compare/@proteinjs/server@2.1.0...@proteinjs/server@2.1.1) (2024-10-19)
 
 
