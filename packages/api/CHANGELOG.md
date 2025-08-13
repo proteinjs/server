@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [2.0.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.5.4...@proteinjs/server-api@2.0.0) (2025-08-13)
+
+
+* feat!: Moved `FeatureFlag` into `@proteinjs/feature-flag-*` packages. ([d778c19](https://github.com/brentbahry/server/commit/d778c1917e978572ed64e20a7d757970ba80ca1b))
+
+
+### BREAKING CHANGES
+
+* Removed legacy `FeatureFlag` API.
+
+
+
+
+
 # [1.5.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@1.4.3...@proteinjs/server-api@1.5.0) (2024-08-26)
 
 
