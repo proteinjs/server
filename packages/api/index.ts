@@ -8,6 +8,5 @@ export * from './src/session/SessionDataCache';
 export * from './src/cacheKeys';
 export * from './src/EnvInfo';
 export * from './src/EnvRepo';
-export * from './src/FeatureFlag';
 export * from './src/ServerRenderedScript';
 export * from './src/StartupTask';
