@@ -1,6 +1,6 @@
 {
   "name": "@proteinjs/server",
-  "version": "2.1.7",
+  "version": "2.1.8",
   "description": "A server impl",
   "publishConfig": {
     "access": "public"
@@ -22,11 +22,11 @@
   },
   "dependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "0.5.11",
-    "@proteinjs/event": "^1.0.6",
-    "@proteinjs/logger": "1.0.10",
+    "@proteinjs/event": "^1.0.7",
+    "@proteinjs/logger": "1.0.11",
     "@proteinjs/reflection": "1.1.10",
-    "@proteinjs/server-api": "^2.0.0",
-    "@proteinjs/util-node": "1.4.2",
+    "@proteinjs/server-api": "^2.0.1",
+    "@proteinjs/util-node": "1.5.0",
     "body-parser": "1.19.0",
     "buffer": "6.0.3",
     "cookie-parser": "1.4.5",
@@ -56,7 +56,7 @@
     "webpack-hot-middleware": "2.26.0"
   },
   "devDependencies": {
-    "@proteinjs/reflection-build": "1.2.0",
+    "@proteinjs/reflection-build": "1.2.1",
     "@types/body-parser": "1.19.0",
     "@types/cookie-parser": "1.4.2",
     "@types/express": "4.17.7",
