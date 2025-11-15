@@ -38,6 +38,10 @@ module.exports = {
       '@mui/joy': path.join(nodeModulesPath, '@mui/joy'),
       '@mui/material': path.join(nodeModulesPath, '@mui/material'),
       '@mui/icons-material': path.join(nodeModulesPath, '@mui/icons-material'),
+      '@mui/material/styles': path.resolve(nodeModulesPath, '@mui/material/styles'),
+      '@mui/system': path.resolve(nodeModulesPath, '@mui/system'),
+      '@mui/private-theming': path.resolve(nodeModulesPath, '@mui/private-theming'),
+      '@mui/styled-engine': path.resolve(nodeModulesPath, '@mui/styled-engine'),
       'webpack-hot-middleware': path.join(nodeModulesPath, 'webpack-hot-middleware'),
       'react-query': path.join(nodeModulesPath, 'react-query'),
       'react-router': path.join(nodeModulesPath, 'react-router'),
@@ -53,6 +57,7 @@ module.exports = {
       stream: require.resolve('stream-browserify'),
       'process/browser': require.resolve('process/browser'),
       path: require.resolve('path-browserify'),
+      vm: require.resolve('vm-browserify'),
     },
   },
   // since this webpack.config is invoked via webpack-dev-middleware in the process of the consuming server package (not this package)
