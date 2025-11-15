@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.1.10](https://github.com/proteinjs/server/compare/@proteinjs/server@2.1.9...@proteinjs/server@2.1.10) (2025-11-15)
+
+
+### Bug Fixes
+
+* Add `vm-browserify` ([be37a17](https://github.com/proteinjs/server/commit/be37a17e17b730dd8915d93e1b9c679894744d69))
+
+
+
+
+
 ## [2.1.7](https://github.com/proteinjs/server/compare/@proteinjs/server@2.1.6...@proteinjs/server@2.1.7) (2025-08-13)
 
 **Note:** Version bump only for package @proteinjs/server
