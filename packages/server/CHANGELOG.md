@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.0.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.0.0...@proteinjs/server@3.0.1) (2025-11-16)
+
+
+### Bug Fixes
+
+* `startServer` should resolve all dependencies used in webpack hot client builds to the consuming ui package's node_modules. Was grabbing some (ie. webpack-hot-middleware) from the consuming server package. ([e128e83](https://github.com/proteinjs/server/commit/e128e83e6cb8c57bf972ef86c41805b8ab852a56))
+
+
+
+
+
 # [3.0.0](https://github.com/proteinjs/server/compare/@proteinjs/server@2.1.10...@proteinjs/server@3.0.0) (2025-11-16)
 
 
