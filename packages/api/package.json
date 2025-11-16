@@ -1,6 +1,6 @@
 {
   "name": "@proteinjs/server-api",
-  "version": "2.0.2",
+  "version": "3.0.0",
   "description": "Server apis only (server implementation in @proteinjs/server)",
   "publishConfig": {
     "access": "public"

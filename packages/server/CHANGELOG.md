@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.0.0](https://github.com/proteinjs/server/compare/@proteinjs/server@2.1.10...@proteinjs/server@3.0.0) (2025-11-16)
+
+
+* feat!: Server now constructs hot client builds entirely from the consumer's webpack config and node_modules. ([bf9a7dd](https://github.com/proteinjs/server/commit/bf9a7dddbbfa2d0f3b9ad6b4a54fb706dd0dab2b))
+
+
+### BREAKING CHANGES
+
+* Added required `ServerConfig.hotClientBuilds.webpackConfigPath` prop to enable hot client builds.
+
+
+
+
+
 ## [2.1.10](https://github.com/proteinjs/server/compare/@proteinjs/server@2.1.9...@proteinjs/server@2.1.10) (2025-11-15)
 
 
