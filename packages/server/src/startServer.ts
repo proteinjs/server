@@ -121,7 +121,7 @@ function initializeHotReloading(app: express.Express, config: ServerConfig) {
   const webpackDevMiddleware = appRequire('webpack-dev-middleware');
   const webpackHotMiddleware = appRequire('webpack-hot-middleware');
 
-  const devConfig = createWebpackConfigOverlay(config, webpack);
+  const devConfig = createWebpackConfigOverlay(config, webpack, appRequire);
 
   const compiler = webpack(devConfig);
 
@@ -139,7 +139,7 @@ function makeAppRequire(nodeModulesPath: string) {
   return createRequire(path.join(nodeModulesPath, '__app_require__.js'));
 }
 
-function createWebpackConfigOverlay(config: ServerConfig, webpack: any) {
+function createWebpackConfigOverlay(config: ServerConfig, webpack: any, appRequire: any) {
   // Load the consumer webpack config (CommonJS). If it exports a function, call with { mode: 'development' }.
   const consumerExport = require(config.hotClientBuilds!.webpackConfigPath);
   const baseConfig = typeof consumerExport === 'function' ? consumerExport({ mode: 'development' }) : consumerExport;
@@ -147,15 +147,24 @@ function createWebpackConfigOverlay(config: ServerConfig, webpack: any) {
 
   devConfig.mode = 'development';
 
-  // Inject HMR client + the consumer's entrypoint (absolute path already provided)
-  // Keep it minimal: no query params; defaults are fine.
-  devConfig.entry = { app: ['webpack-hot-middleware/client', config.staticContent!.appEntryPath] };
+  // Ensure the compiler context points at the consumer app root (helps some plugins)
+  devConfig.context = devConfig.context || path.dirname(config.hotClientBuilds!.nodeModulesPath);
+
+  // Use an ABSOLUTE path to the HMR client from the consumer's node_modules
+  const hmrClientAbs = appRequire.resolve('webpack-hot-middleware/client');
+  devConfig.entry = { app: [hmrClientAbs, config.staticContent!.appEntryPath] };
 
   // Ensure bundles are served from memory at /static/, and set a concrete path for plugins that read it.
   devConfig.output = {
     ...(baseConfig.output || {}),
     publicPath: staticContentPath,
     path: config.staticContent!.staticContentDir, // safe for plugins; dev-middleware serves from memory
+  };
+
+  // Make loaders (e.g., ts-loader) resolve from the consumer's node_modules
+  devConfig.resolveLoader = {
+    ...(devConfig.resolveLoader || {}),
+    modules: [config.hotClientBuilds!.nodeModulesPath, 'node_modules'],
   };
 
   // Ensure HMR plugin exists (idempotent)
