@@ -1,12 +1,11 @@
+import path from 'path';
+import { createRequire } from 'module';
 import express from 'express';
 import expressSession from 'express-session';
 import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import passport from 'passport';
 import passportLocal from 'passport-local';
-import webpack from 'webpack';
-import webpackDevMiddleware from 'webpack-dev-middleware';
-import webpackHotMiddleware from 'webpack-hot-middleware';
 import { Server as HttpServer } from 'http';
 import {
   Global,
@@ -19,7 +18,6 @@ import {
 } from '@proteinjs/server-api';
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { Logger } from '@proteinjs/logger';
-import { setNodeModulesPath } from './nodeModulesPath';
 import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
 
 const staticContentPath = '/static/';
@@ -103,33 +101,71 @@ function configureRequests(app: express.Express) {
 }
 
 function initializeHotReloading(app: express.Express, config: ServerConfig) {
+  // Enable only in dev with all required settings present
   if (
     !process.env.DEVELOPMENT ||
     process.env.DISABLE_HOT_CLIENT_BUILDS ||
     !config.hotClientBuilds ||
+    !config.hotClientBuilds.nodeModulesPath ||
+    !config.hotClientBuilds.webpackConfigPath ||
     !config.staticContent?.staticContentDir ||
     !config.staticContent?.appEntryPath
   ) {
     return;
   }
 
-  const wpConfig = Object.assign({}, getWebpackConfig(config));
-  wpConfig['entry'] = { app: ['webpack-hot-middleware/client', config.staticContent.appEntryPath] };
-  wpConfig['output']['path'] = config.staticContent.staticContentDir;
-  wpConfig['output']['publicPath'] = staticContentPath;
-  const webpackCompiler = webpack(wpConfig);
+  const appRequire = makeAppRequire(config.hotClientBuilds.nodeModulesPath);
+
+  // Load webpack & middlewares from the consumer app
+  const webpack = appRequire('webpack');
+  const webpackDevMiddleware = appRequire('webpack-dev-middleware');
+  const webpackHotMiddleware = appRequire('webpack-hot-middleware');
+
+  const devConfig = createWebpackConfigOverlay(config, webpack);
+
+  const compiler = webpack(devConfig);
+
   app.use(
-    webpackDevMiddleware(webpackCompiler, {
+    webpackDevMiddleware(compiler, {
       publicPath: staticContentPath,
     })
   );
-  app.use(webpackHotMiddleware(webpackCompiler));
+  app.use(webpackHotMiddleware(compiler));
 }
 
-function getWebpackConfig(config: ServerConfig) {
-  setNodeModulesPath(config.hotClientBuilds?.nodeModulesPath as string);
-  const webpackConfig = require('../webpack.config');
-  return webpackConfig;
+// Resolve modules (webpack + middlewares) from the consumer’s node_modules
+function makeAppRequire(nodeModulesPath: string) {
+  // Any file under the consumer's node_modules works as a base for createRequire
+  return createRequire(path.join(nodeModulesPath, '__app_require__.js'));
+}
+
+function createWebpackConfigOverlay(config: ServerConfig, webpack: any) {
+  // Load the consumer webpack config (CommonJS). If it exports a function, call with { mode: 'development' }.
+  const consumerExport = require(config.hotClientBuilds!.webpackConfigPath);
+  const baseConfig = typeof consumerExport === 'function' ? consumerExport({ mode: 'development' }) : consumerExport;
+  const devConfig: any = { ...baseConfig };
+
+  devConfig.mode = 'development';
+
+  // Inject HMR client + the consumer's entrypoint (absolute path already provided)
+  // Keep it minimal: no query params; defaults are fine.
+  devConfig.entry = { app: ['webpack-hot-middleware/client', config.staticContent!.appEntryPath] };
+
+  // Ensure bundles are served from memory at /static/, and set a concrete path for plugins that read it.
+  devConfig.output = {
+    ...(baseConfig.output || {}),
+    publicPath: staticContentPath,
+    path: config.staticContent!.staticContentDir, // safe for plugins; dev-middleware serves from memory
+  };
+
+  // Ensure HMR plugin exists (idempotent)
+  devConfig.plugins = devConfig.plugins ?? [];
+  const hasHmr = devConfig.plugins.some((p: any) => p?.constructor?.name === 'HotModuleReplacementPlugin');
+  if (!hasHmr) {
+    devConfig.plugins.push(new webpack.HotModuleReplacementPlugin());
+  }
+
+  return devConfig;
 }
 
 function configureHttps(app: express.Express) {

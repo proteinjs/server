@@ -29,6 +29,7 @@ export interface ServerConfig {
   /** enables webpack builds on server-side; otherwise will serve bundle from staticContent.bundlePaths (default prod behavior) */
   hotClientBuilds?: {
     nodeModulesPath: string;
+    webpackConfigPath: string;
   };
   disableHotClientBuilds?: boolean;
   port?: number;
