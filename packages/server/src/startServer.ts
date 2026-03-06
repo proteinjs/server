@@ -316,7 +316,7 @@ async function initializeSocketIO(app: express.Express, server: HttpServer) {
 }
 
 function start(server: HttpServer, config: ServerConfig) {
-  const port = config.port ? config.port : 3000;
+  const port = process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT) : config.port ? config.port : 3000;
   server.listen(port, () => {
     if (process.env.DEVELOPMENT) {
       logger.info({ message: `Starting in development mode` });
