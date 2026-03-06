@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.1.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.0.2...@proteinjs/server@3.1.0) (2026-03-06)
+
+
+### Features
+
+* server now accepts (and prioritizes) a `SERVER_PORT` env var. ([735695b](https://github.com/proteinjs/server/commit/735695b9e4473724921eb7ddbd5ed889d03f0fb8))
+
+
+
+
+
 ## [3.0.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.0.0...@proteinjs/server@3.0.1) (2025-11-16)
 
 
