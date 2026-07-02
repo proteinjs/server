@@ -128,6 +128,12 @@ function initializeHotReloading(app: express.Express, config: ServerConfig) {
   app.use(
     webpackDevMiddleware(compiler, {
       publicPath: staticContentPath,
+      // Dev bundles must always be revalidated by the browser. Without a Cache-Control header the
+      // browser applies heuristic freshness and serves a STALE cached bundle after a code change — a
+      // normal (even hard) reload doesn't reliably bust it. `no-cache` forces a conditional request
+      // every load: the changed app bundle comes back fresh (200), while unchanged assets like the
+      // large vendor bundle revalidate cheaply (304, no re-download) so reloads stay fast.
+      headers: { 'Cache-Control': 'no-cache' },
     })
   );
   app.use(webpackHotMiddleware(compiler));
