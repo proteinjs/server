@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.1.6](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.5...@proteinjs/server@3.1.6) (2026-07-02)
+
+
+### Bug Fixes
+
+* serve dev bundles with Cache-Control no-cache ([803a5c6](https://github.com/proteinjs/server/commit/803a5c6ae132389e494ffdef66fef413ef1d6a7f))
+
+
+
+
+
 # [3.1.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.0.2...@proteinjs/server@3.1.0) (2026-03-06)
 
 
