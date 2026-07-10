@@ -7,9 +7,9 @@ export type SessionData = {
 };
 
 export const getSessionDataStorage = () => {
-  const sessionDataStorages = SourceRepository.get().objects<SessionDataStorage>(
-    '@proteinjs/server-api/SessionDataStorage'
-  );
+  const sessionDataStorages = SourceRepository.get()
+    .objects<SessionDataStorage>('@proteinjs/server-api/SessionDataStorage')
+    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   for (const sessionDataStorage of sessionDataStorages) {
     if (sessionDataStorage.environment == 'browser' && typeof window === 'undefined') {
       continue;
@@ -23,6 +23,14 @@ export const getSessionDataStorage = () => {
 
 export interface SessionDataStorage extends Loadable {
   environment: 'node' | 'browser';
+  /**
+   * Higher-priority storages win the lookup. Defaults to 0. Lets a test
+   * harness register a deterministic storage that beats the async_hooks-based
+   * NodeSessionDataStorage, whose context propagation doesn't survive jest's
+   * hook/test boundaries — which storage wins must not depend on reflection
+   * graph load order.
+   */
+  priority?: number;
   setData(data: SessionData): void;
   getData(): SessionData;
 }

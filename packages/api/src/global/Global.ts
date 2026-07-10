@@ -5,9 +5,9 @@ export type GlobalData = {
 };
 
 export const getGlobalDataStorage = (): GlobalDataStorage => {
-  const globalDataStorages = SourceRepository.get().objects<GlobalDataStorage>(
-    '@proteinjs/server-api/GlobalDataStorage'
-  );
+  const globalDataStorages = SourceRepository.get()
+    .objects<GlobalDataStorage>('@proteinjs/server-api/GlobalDataStorage')
+    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
   for (const globalDataStorage of globalDataStorages) {
     if (globalDataStorage.environment == 'browser' && typeof window === 'undefined') {
@@ -22,6 +22,13 @@ export const getGlobalDataStorage = (): GlobalDataStorage => {
 
 export interface GlobalDataStorage extends Loadable {
   environment: 'node' | 'browser';
+  /**
+   * Higher-priority storages win the lookup. Defaults to 0. Lets a test
+   * harness register a deterministic storage that beats the async_hooks-based
+   * NodeGlobalDataStorage — which storage wins must not depend on reflection
+   * graph load order.
+   */
+  priority?: number;
   setData(data: GlobalData): void;
   getData(): GlobalData;
 }
