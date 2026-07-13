@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.1.8](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.7...@proteinjs/server@3.1.8) (2026-07-13)
+
+
+### Bug Fixes
+
+* dev server bundle freshness — gate listen() on first compile, log compile hashes, expose /dev/build-info + ?v= script-tag stamps ([613da1c](https://github.com/proteinjs/server/commit/613da1c86b9901696ac4384784cd4a7b46bb1f9b))
+
+
+
+
+
 ## [3.1.7](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.6...@proteinjs/server@3.1.7) (2026-07-10)
 
 **Note:** Version bump only for package @proteinjs/server
