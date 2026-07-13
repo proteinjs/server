@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.1.7](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.6...@proteinjs/server@3.1.7) (2026-07-10)
+
+**Note:** Version bump only for package @proteinjs/server
+
+
+
+
+
 ## [3.1.6](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.5...@proteinjs/server@3.1.6) (2026-07-02)
 
 
