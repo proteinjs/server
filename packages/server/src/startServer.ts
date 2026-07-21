@@ -63,7 +63,7 @@ export async function startServer(config: ServerConfig) {
     logger.info({ message: `Finished ServerConfig.onStartup` });
   }
 
-  await start(server, config, clientBuildReady);
+  start(server, config, clientBuildReady);
 
   await runStartupTasks('after server start');
 }
@@ -155,8 +155,9 @@ function initializeHotReloading(app: express.Express, config: ServerConfig): Pro
     response.json(DevClientBuild.get() ?? {});
   });
 
-  // Resolves once the FIRST compile completes; start() gates listen() on this so "Server
-  // listening" always means the served bundle is built from current sources.
+  // Resolves once the FIRST compile completes; start() gates the "Server listening" READY LOG on
+  // this (never listen() itself — see the lineage note in start()) so the ready line always means
+  // the served bundle is built from current sources.
   return new Promise<void>((resolve) => devMiddleware.waitUntilValid(() => resolve()));
 }
 
@@ -342,21 +343,34 @@ async function initializeSocketIO(app: express.Express, server: HttpServer) {
   });
 }
 
-async function start(server: HttpServer, config: ServerConfig, clientBuildReady?: Promise<void>) {
-  if (clientBuildReady) {
-    // Don't accept requests until the first client bundle build completes — a page load in the
-    // listen-before-built window would otherwise hang on (or worse, cache-race) a half-ready
-    // bundle. "Server listening" below therefore implies "bundle ready".
-    logger.info({ message: `Waiting for the initial client bundle build before listening` });
-    await clientBuildReady;
-  }
-
+function start(server: HttpServer, config: ServerConfig, clientBuildReady?: Promise<void>) {
   const port = process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT) : config.port ? config.port : 3000;
+  // listen() MUST be called synchronously in THIS async context — the one `startServer` seeded
+  // with the Global data caches (env cache etc.). Request async resources descend from the listen
+  // handle, and the async_hooks-backed Global/Session storages propagate data by lineage: awaiting
+  // anything here re-parents the handle into the resolver's (unseeded) lineage, every request
+  // loses the env cache, and EnvInfo.isDev() fails CLOSED to prod (observed live: all dev-gated
+  // skills silently vanished from the agent's tool surface). The freshness contract rides the
+  // READY LOG instead: "Server listening" prints only after the first client bundle compile, so
+  // tooling that gates on that line still gets "ready implies bundle built" — while asset
+  // requests in the compile window are simply queued by webpack-dev-middleware as always.
   server.listen(port, () => {
-    if (process.env.DEVELOPMENT) {
-      logger.info({ message: `Starting in development mode` });
+    const logReady = () => {
+      if (process.env.DEVELOPMENT) {
+        logger.info({ message: `Starting in development mode` });
+      }
+
+      logger.info({ message: `Server listening on port: ${port}` });
+    };
+
+    if (clientBuildReady) {
+      logger.info({
+        message: `Listening on port ${port}; waiting for the initial client bundle build before declaring ready`,
+      });
+      void clientBuildReady.then(logReady);
+      return;
     }
 
-    logger.info({ message: `Server listening on port: ${port}` });
+    logReady();
   });
 }
