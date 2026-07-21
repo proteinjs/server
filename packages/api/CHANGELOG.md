@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.0.8](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.0.7...@proteinjs/server-api@3.0.8) (2026-07-21)
+
+
+### Bug Fixes
+
+* session/global data storage lookup honors priority so test storages deterministically win ([e157e53](https://github.com/brentbahry/server/commit/e157e530846f60cfd53c6dca4ad04e2fce31cbd1))
+
+
+
+
+
 ## [3.0.7](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.0.6...@proteinjs/server-api@3.0.7) (2026-07-10)
 
 **Note:** Version bump only for package @proteinjs/server-api

@@ -1,6 +1,6 @@
 {
   "name": "@proteinjs/server",
-  "version": "3.1.9",
+  "version": "3.1.10",
   "description": "A server impl",
   "publishConfig": {
     "access": "public"
@@ -24,7 +24,7 @@
     "@proteinjs/event": "^1.0.14",
     "@proteinjs/logger": "^1.0.19",
     "@proteinjs/reflection": "^1.1.11",
-    "@proteinjs/server-api": "^3.0.7",
+    "@proteinjs/server-api": "^3.0.8",
     "@proteinjs/util-node": "^1.8.1",
     "body-parser": "1.19.0",
     "cookie-parser": "1.4.5",
