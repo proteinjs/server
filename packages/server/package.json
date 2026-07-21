@@ -1,6 +1,6 @@
 {
   "name": "@proteinjs/server",
-  "version": "3.1.10",
+  "version": "3.1.11",
   "description": "A server impl",
   "publishConfig": {
     "access": "public"
@@ -21,11 +21,11 @@
     "watch": "reflection-watch"
   },
   "dependencies": {
-    "@proteinjs/event": "^1.0.14",
-    "@proteinjs/logger": "^1.0.19",
+    "@proteinjs/event": "^1.0.15",
+    "@proteinjs/logger": "^1.0.20",
     "@proteinjs/reflection": "^1.1.11",
-    "@proteinjs/server-api": "^3.0.8",
-    "@proteinjs/util-node": "^1.8.1",
+    "@proteinjs/server-api": "^3.0.9",
+    "@proteinjs/util-node": "^1.9.0",
     "body-parser": "1.19.0",
     "cookie-parser": "1.4.5",
     "events": "3.3.0",
@@ -40,7 +40,7 @@
     "typescript": "5.2.2"
   },
   "devDependencies": {
-    "@proteinjs/reflection-build": "^1.4.7",
+    "@proteinjs/reflection-build": "^1.4.8",
     "@types/body-parser": "1.19.0",
     "@types/cookie-parser": "1.4.2",
     "@types/express": "4.17.7",
