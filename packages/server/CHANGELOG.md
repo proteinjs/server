@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.1.9](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.8...@proteinjs/server@3.1.9) (2026-07-21)
+
+
+### Bug Fixes
+
+* listen() must stay in the seeded boot async context — gate only the ready LOG on the first compile ([7eb9b2e](https://github.com/proteinjs/server/commit/7eb9b2e3a032098dfdda0558dcb0070b360102f8))
+
+
+
+
+
 ## [3.1.8](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.7...@proteinjs/server@3.1.8) (2026-07-13)
 
 
