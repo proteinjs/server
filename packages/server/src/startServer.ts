@@ -19,6 +19,7 @@ import {
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { Logger } from '@proteinjs/logger';
 import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
+import { DevClientBuild } from './DevClientBuild';
 
 const staticContentPath = '/static/';
 const logger = new Logger({ name: 'Server' });
@@ -29,7 +30,7 @@ export async function startServer(config: ServerConfig) {
   await runStartupTasks('before server config');
   const routes = getRoutes();
   configureRequests(app);
-  initializeHotReloading(app, config);
+  const clientBuildReady = initializeHotReloading(app, config);
   configureSession(app, config);
   beforeRequest(app, config);
   loadRoutes(
@@ -62,7 +63,7 @@ export async function startServer(config: ServerConfig) {
     logger.info({ message: `Finished ServerConfig.onStartup` });
   }
 
-  start(server, config);
+  start(server, config, clientBuildReady);
 
   await runStartupTasks('after server start');
 }
@@ -100,7 +101,7 @@ function configureRequests(app: express.Express) {
   app.disable('x-powered-by');
 }
 
-function initializeHotReloading(app: express.Express, config: ServerConfig) {
+function initializeHotReloading(app: express.Express, config: ServerConfig): Promise<void> | undefined {
   // Enable only in dev with all required settings present
   if (
     !process.env.DEVELOPMENT ||
@@ -125,18 +126,39 @@ function initializeHotReloading(app: express.Express, config: ServerConfig) {
 
   const compiler = webpack(devConfig);
 
-  app.use(
-    webpackDevMiddleware(compiler, {
-      publicPath: staticContentPath,
-      // Dev bundles must always be revalidated by the browser. Without a Cache-Control header the
-      // browser applies heuristic freshness and serves a STALE cached bundle after a code change — a
-      // normal (even hard) reload doesn't reliably bust it. `no-cache` forces a conditional request
-      // every load: the changed app bundle comes back fresh (200), while unchanged assets like the
-      // large vendor bundle revalidate cheaply (304, no re-download) so reloads stay fast.
-      headers: { 'Cache-Control': 'no-cache' },
-    })
-  );
+  // Every completed compile is recorded (for the `?v=<hash>` script-tag stamp + /dev/build-info)
+  // and logged, so "which build is this page running?" is answerable instead of guessable.
+  compiler.hooks.done.tap('proteinjs-server', (stats: any) => {
+    const { hash, time, errors } = stats.toJson({ all: false, hash: true, timings: true, errors: true });
+    const errorCount = errors?.length ?? 0;
+    DevClientBuild.record({ hash, builtAt: new Date().toISOString(), durationMs: time, errorCount });
+    if (errorCount > 0) {
+      logger.error({ message: `Client bundle compiled WITH ERRORS`, obj: { hash, durationMs: time, errorCount } });
+    } else {
+      logger.info({ message: `Client bundle compiled`, obj: { hash, durationMs: time } });
+    }
+  });
+
+  const devMiddleware = webpackDevMiddleware(compiler, {
+    publicPath: staticContentPath,
+    // Dev bundles must always be revalidated by the browser. Without a Cache-Control header the
+    // browser applies heuristic freshness and serves a STALE cached bundle after a code change — a
+    // normal (even hard) reload doesn't reliably bust it. `no-cache` forces a conditional request
+    // every load: the changed app bundle comes back fresh (200), while unchanged assets like the
+    // large vendor bundle revalidate cheaply (304, no re-download) so reloads stay fast.
+    headers: { 'Cache-Control': 'no-cache' },
+  });
+  app.use(devMiddleware);
   app.use(webpackHotMiddleware(compiler));
+
+  app.get('/dev/build-info', (request: express.Request, response: express.Response) => {
+    response.json(DevClientBuild.get() ?? {});
+  });
+
+  // Resolves once the FIRST compile completes; start() gates the "Server listening" READY LOG on
+  // this (never listen() itself — see the lineage note in start()) so the ready line always means
+  // the served bundle is built from current sources.
+  return new Promise<void>((resolve) => devMiddleware.waitUntilValid(() => resolve()));
 }
 
 // Resolve modules (webpack + middlewares) from the consumer’s node_modules
@@ -321,13 +343,34 @@ async function initializeSocketIO(app: express.Express, server: HttpServer) {
   });
 }
 
-function start(server: HttpServer, config: ServerConfig) {
+function start(server: HttpServer, config: ServerConfig, clientBuildReady?: Promise<void>) {
   const port = process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT) : config.port ? config.port : 3000;
+  // listen() MUST be called synchronously in THIS async context — the one `startServer` seeded
+  // with the Global data caches (env cache etc.). Request async resources descend from the listen
+  // handle, and the async_hooks-backed Global/Session storages propagate data by lineage: awaiting
+  // anything here re-parents the handle into the resolver's (unseeded) lineage, every request
+  // loses the env cache, and EnvInfo.isDev() fails CLOSED to prod (observed live: all dev-gated
+  // skills silently vanished from the agent's tool surface). The freshness contract rides the
+  // READY LOG instead: "Server listening" prints only after the first client bundle compile, so
+  // tooling that gates on that line still gets "ready implies bundle built" — while asset
+  // requests in the compile window are simply queued by webpack-dev-middleware as always.
   server.listen(port, () => {
-    if (process.env.DEVELOPMENT) {
-      logger.info({ message: `Starting in development mode` });
+    const logReady = () => {
+      if (process.env.DEVELOPMENT) {
+        logger.info({ message: `Starting in development mode` });
+      }
+
+      logger.info({ message: `Server listening on port: ${port}` });
+    };
+
+    if (clientBuildReady) {
+      logger.info({
+        message: `Listening on port ${port}; waiting for the initial client bundle build before declaring ready`,
+      });
+      void clientBuildReady.then(logReady);
+      return;
     }
 
-    logger.info({ message: `Server listening on port: ${port}` });
+    logReady();
   });
 }

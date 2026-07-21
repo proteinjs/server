@@ -2,6 +2,7 @@ import path from 'path';
 import ReactHelmet from 'react-helmet';
 import { ServerConfig, getServerRenderedScripts } from '@proteinjs/server-api';
 import { Fs } from '@proteinjs/util-node';
+import { DevClientBuild } from '../DevClientBuild';
 
 export const createReactApp = (serverConfig: ServerConfig) => {
   return {
@@ -45,8 +46,12 @@ async function bundleScriptTags(serverConfig: ServerConfig) {
 
   const scriptTags: string[] = [];
   if (process.env.DEVELOPMENT && !process.env.DISABLE_HOT_CLIENT_BUILDS) {
-    scriptTags.push(`<script src='${path.join('/static/', 'app.js')}'></script>`);
-    scriptTags.push(`<script src='${path.join('/static/', 'vendor.js')}'></script>`);
+    // `?v=<hash>` stamps the page with the compile it was served against: it deterministically
+    // busts the browser cache on new builds, and lets tooling verify a live page against
+    // /dev/build-info (matching hash = provably running the current build).
+    const stamp = DevClientBuild.get() ? `?v=${DevClientBuild.get()!.hash}` : '';
+    scriptTags.push(`<script src='${path.join('/static/', 'app.js')}${stamp}'></script>`);
+    scriptTags.push(`<script src='${path.join('/static/', 'vendor.js')}${stamp}'></script>`);
   } else if (serverConfig.staticContent?.bundlePaths) {
     for (const bundlePath of serverConfig.staticContent.bundlePaths) {
       scriptTags.push(`<script src='${path.join('/static/', bundlePath)}'></script>`);
