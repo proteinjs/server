@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.1.13](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.12...@proteinjs/server@3.1.13) (2026-08-05)
+
+
+### Bug Fixes
+
+* HMR event stream serves from its own origin — dev tabs no longer exhaust the app origin's connection pool ([128bf23](https://github.com/proteinjs/server/commit/128bf2370c6840acc15a94c3f8a2891b05c920df))
+
+
+
+
+
 ## [3.1.10](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.9...@proteinjs/server@3.1.10) (2026-07-21)
 
 **Note:** Version bump only for package @proteinjs/server
