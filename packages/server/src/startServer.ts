@@ -122,9 +122,11 @@ function initializeHotReloading(app: express.Express, config: ServerConfig): Pro
   const webpackDevMiddleware = appRequire('webpack-dev-middleware');
   const webpackHotMiddleware = appRequire('webpack-hot-middleware');
 
-  // Same port resolution start() uses (SERVER_PORT wins), +1 — the stream's own origin.
+  // Same port resolution start() uses (SERVER_PORT wins), +100 — the stream's own origin.
+  // +1 would collide with a sibling workspace: local workspaces run their apps on
+  // consecutive ports (3002, 3004, ...); +100 maps 3002→3102, 3004→3104, clear of all.
   const appPort = process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT) : config.port ? config.port : 3000;
-  const hmrPort = Number(process.env.HMR_PORT) || appPort + 1;
+  const hmrPort = Number(process.env.HMR_PORT) || appPort + 100;
   const devConfig = createWebpackConfigOverlay(config, webpack, appRequire, hmrPort);
 
   const compiler = webpack(devConfig);
@@ -153,7 +155,7 @@ function initializeHotReloading(app: express.Express, config: ServerConfig): Pro
   });
   app.use(devMiddleware);
 
-  // The HMR EVENT STREAM lives on its OWN ORIGIN (port + 1, or HMR_PORT), never the app's.
+  // The HMR EVENT STREAM lives on its OWN ORIGIN (port + 100, or HMR_PORT), never the app's.
   // Each open dev tab holds one persistent SSE connection for hot updates, and SSE counts
   // against Chrome's 6-connections-per-origin HTTP/1.1 limit — with the stream on the app
   // origin, ~6 accumulated tabs (agent-driven panes accumulate them fast) silently exhausted
@@ -207,9 +209,16 @@ function createWebpackConfigOverlay(config: ServerConfig, webpack: any, appRequi
   // Use an ABSOLUTE path to the HMR client from the consumer's node_modules. The `path` query
   // points the client's EventSource at the stream's OWN ORIGIN (see the sibling listener in
   // initializeHotReloading) so dev tabs never spend app-origin connection slots on SSE.
+  // The visibility gate (compiled by this package's own build) must come FIRST: its
+  // EventSource patch has to be installed before the HMR client connects, so only VISIBLE
+  // tabs hold a stream slot (hidden tabs drop theirs and re-sync on reconnect).
+  const visibilityGateAbs = require.resolve('./VisibilityGatedEventSource');
   const hmrClientAbs = appRequire.resolve('webpack-hot-middleware/client');
-  const hmrClientEntry = `${hmrClientAbs}?path=http://localhost:${hmrPort}/__webpack_hmr`;
-  devConfig.entry = { app: [hmrClientEntry, config.staticContent!.appEntryPath] };
+  // reload=true: when hot-apply can't complete (typically a tab that sat hidden across a
+  // server restart — the new process has none of the old hot-update manifests), the client
+  // falls back to a full reload instead of warning and silently serving a stale bundle.
+  const hmrClientEntry = `${hmrClientAbs}?path=http://localhost:${hmrPort}/__webpack_hmr&reload=true`;
+  devConfig.entry = { app: [visibilityGateAbs, hmrClientEntry, config.staticContent!.appEntryPath] };
 
   // Ensure bundles are served from memory at /static/, and set a concrete path for plugins that read it.
   devConfig.output = {
