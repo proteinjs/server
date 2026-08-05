@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import passport from 'passport';
 import passportLocal from 'passport-local';
-import { Server as HttpServer } from 'http';
+import { createServer as createHttpServer, Server as HttpServer } from 'http';
 import {
   Global,
   GlobalData,
@@ -122,7 +122,10 @@ function initializeHotReloading(app: express.Express, config: ServerConfig): Pro
   const webpackDevMiddleware = appRequire('webpack-dev-middleware');
   const webpackHotMiddleware = appRequire('webpack-hot-middleware');
 
-  const devConfig = createWebpackConfigOverlay(config, webpack, appRequire);
+  // Same port resolution start() uses (SERVER_PORT wins), +1 — the stream's own origin.
+  const appPort = process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT) : config.port ? config.port : 3000;
+  const hmrPort = Number(process.env.HMR_PORT) || appPort + 1;
+  const devConfig = createWebpackConfigOverlay(config, webpack, appRequire, hmrPort);
 
   const compiler = webpack(devConfig);
 
@@ -149,7 +152,30 @@ function initializeHotReloading(app: express.Express, config: ServerConfig): Pro
     headers: { 'Cache-Control': 'no-cache' },
   });
   app.use(devMiddleware);
-  app.use(webpackHotMiddleware(compiler));
+
+  // The HMR EVENT STREAM lives on its OWN ORIGIN (port + 1, or HMR_PORT), never the app's.
+  // Each open dev tab holds one persistent SSE connection for hot updates, and SSE counts
+  // against Chrome's 6-connections-per-origin HTTP/1.1 limit — with the stream on the app
+  // origin, ~6 accumulated tabs (agent-driven panes accumulate them fast) silently exhausted
+  // the pool and EVERY new fetch from ANY tab stalled forever in the browser queue (verified
+  // live 2026-08-01: a stalled service POST completed the instant two idle tabs closed; it
+  // silently dropped a chat send). On a separate origin the streams pool against their own
+  // 6-slot budget: past ~6 tabs, a background tab's LIVE-RELOAD degrades (its stream queues
+  // until a slot frees) but app requests are untouched — the failure mode this layer must
+  // never have. HTTP/2 (no per-origin cap) was rejected: browsers require TLS for h2, and a
+  // local cert-trust story is a far bigger footprint than one extra dev-only listener.
+  const hmrMiddleware = webpackHotMiddleware(compiler);
+  const hmrServer = createHttpServer((request, response) => {
+    // Dev-only sibling: SSE GETs from the app origin — permissive CORS is correct here.
+    response.setHeader('Access-Control-Allow-Origin', '*');
+    hmrMiddleware(request, response, () => {
+      response.statusCode = 404;
+      response.end();
+    });
+  });
+  hmrServer.listen(hmrPort, () => {
+    logger.info({ message: `HMR event stream listening on its own origin`, obj: { hmrPort } });
+  });
 
   app.get('/dev/build-info', (request: express.Request, response: express.Response) => {
     response.json(DevClientBuild.get() ?? {});
@@ -167,7 +193,7 @@ function makeAppRequire(nodeModulesPath: string) {
   return createRequire(path.join(nodeModulesPath, '__app_require__.js'));
 }
 
-function createWebpackConfigOverlay(config: ServerConfig, webpack: any, appRequire: any) {
+function createWebpackConfigOverlay(config: ServerConfig, webpack: any, appRequire: any, hmrPort: number) {
   // Load the consumer webpack config (CommonJS). If it exports a function, call with { mode: 'development' }.
   const consumerExport = require(config.hotClientBuilds!.webpackConfigPath);
   const baseConfig = typeof consumerExport === 'function' ? consumerExport({ mode: 'development' }) : consumerExport;
@@ -178,9 +204,12 @@ function createWebpackConfigOverlay(config: ServerConfig, webpack: any, appRequi
   // Ensure the compiler context points at the consumer app root (helps some plugins)
   devConfig.context = devConfig.context || path.dirname(config.hotClientBuilds!.nodeModulesPath);
 
-  // Use an ABSOLUTE path to the HMR client from the consumer's node_modules
+  // Use an ABSOLUTE path to the HMR client from the consumer's node_modules. The `path` query
+  // points the client's EventSource at the stream's OWN ORIGIN (see the sibling listener in
+  // initializeHotReloading) so dev tabs never spend app-origin connection slots on SSE.
   const hmrClientAbs = appRequire.resolve('webpack-hot-middleware/client');
-  devConfig.entry = { app: [hmrClientAbs, config.staticContent!.appEntryPath] };
+  const hmrClientEntry = `${hmrClientAbs}?path=http://localhost:${hmrPort}/__webpack_hmr`;
+  devConfig.entry = { app: [hmrClientEntry, config.staticContent!.appEntryPath] };
 
   // Ensure bundles are served from memory at /static/, and set a concrete path for plugins that read it.
   devConfig.output = {
