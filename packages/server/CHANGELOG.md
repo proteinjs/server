@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.1.14](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.13...@proteinjs/server@3.1.14) (2026-08-05)
+
+
+### Bug Fixes
+
+* HMR slot hygiene — +100 port scheme and visibility-gated connections ([8409a69](https://github.com/proteinjs/server/commit/8409a693aac3dfed5e2ddf7f024ff717f4affd35))
+
+
+
+
+
 ## [3.1.13](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.12...@proteinjs/server@3.1.13) (2026-08-05)
 
 
