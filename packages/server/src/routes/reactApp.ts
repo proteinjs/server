@@ -4,6 +4,12 @@ import { ServerConfig, getServerRenderedScripts } from '@proteinjs/server-api';
 import { Fs } from '@proteinjs/util-node';
 import { DevClientBuild } from '../DevClientBuild';
 
+// Browser-chrome ground colors mirrored from @n3xah/util-ui Theme.tsx getTheme()
+// (lightPalette/darkPalette `background.default`) — proteinjs cannot import n3xah,
+// so the hex values are hard-coded here and must track that file.
+const THEME_COLOR_LIGHT = '#FAFAFB';
+const THEME_COLOR_DARK = '#202020';
+
 export const createReactApp = (serverConfig: ServerConfig) => {
   return {
     path: '*',
@@ -22,7 +28,9 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                 <html ${helmet.htmlAttributes}>
                     <head>
                         <meta charset='utf-8' />
-                        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                        <meta name='viewport' content='width=device-width, initial-scale=1.0, viewport-fit=cover'>
+                        <meta name='theme-color' content='${THEME_COLOR_LIGHT}' media='(prefers-color-scheme: light)'>
+                        <meta name='theme-color' content='${THEME_COLOR_DARK}' media='(prefers-color-scheme: dark)'>
                         <link href='${serverConfig.staticContent?.faviconPath ? path.join('/static/', serverConfig.staticContent.faviconPath) : ''}' rel='icon' type='image/png' />
                         ${helmet.title.toString()}
                         ${helmet.meta.toString()}
