@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.2.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.14...@proteinjs/server@3.2.0) (2026-08-11)
+
+
+### Features
+
+* re-export the socket.io namespace and socket types ([a6ed703](https://github.com/proteinjs/server/commit/a6ed703c273b311c61c95bbf9ae3fc934364fbad))
+
+
+
+
+
 ## [3.1.14](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.13...@proteinjs/server@3.1.14) (2026-08-05)
 
 
