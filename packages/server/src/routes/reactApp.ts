@@ -28,7 +28,7 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                 <html ${helmet.htmlAttributes}>
                     <head>
                         <meta charset='utf-8' />
-                        <meta name='viewport' content='width=device-width, initial-scale=1.0, viewport-fit=cover'>
+                        <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover'>
                         <meta name='theme-color' content='${THEME_COLOR_LIGHT}' media='(prefers-color-scheme: light)'>
                         <meta name='theme-color' content='${THEME_COLOR_DARK}' media='(prefers-color-scheme: dark)'>
                         <link href='${serverConfig.staticContent?.faviconPath ? path.join('/static/', serverConfig.staticContent.faviconPath) : ''}' rel='icon' type='image/png' />
