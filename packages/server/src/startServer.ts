@@ -20,6 +20,7 @@ import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { Logger } from '@proteinjs/logger';
 import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
 import { DevClientBuild } from './DevClientBuild';
+import { GracefulShutdown } from './GracefulShutdown';
 
 const staticContentPath = '/static/';
 const logger = new Logger({ name: 'Server' });
@@ -27,6 +28,9 @@ const app = express();
 const server = new HttpServer(app);
 
 export async function startServer(config: ServerConfig) {
+  // First, before any (possibly long) startup work: a SIGTERM must drain gracefully from the
+  // moment this process can be part of a rollout, including mid-boot.
+  GracefulShutdown.install(server, config);
   await runStartupTasks('before server config');
   const routes = getRoutes();
   configureRequests(app);
