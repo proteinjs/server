@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.3.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.2.1...@proteinjs/server@3.3.0) (2026-08-12)
+
+
+### Features
+
+* graceful shutdown — SIGTERM drains (readiness 503, bounded, exit 0) ([e98b8bc](https://github.com/proteinjs/server/commit/e98b8bc563d41f6b2cec9d1064c41d27859e98dd))
+
+
+
+
+
+# [3.2.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.14...@proteinjs/server@3.2.0) (2026-08-11)
+
+
+### Features
+
+* re-export the socket.io namespace and socket types ([a6ed703](https://github.com/proteinjs/server/commit/a6ed703c273b311c61c95bbf9ae3fc934364fbad))
+
+
+
+
+
 ## [3.1.14](https://github.com/proteinjs/server/compare/@proteinjs/server@3.1.13...@proteinjs/server@3.1.14) (2026-08-05)
 
 

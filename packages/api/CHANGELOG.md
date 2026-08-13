@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.1.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.0.11...@proteinjs/server-api@3.1.0) (2026-08-12)
+
+
+### Features
+
+* graceful shutdown — SIGTERM drains (readiness 503, bounded, exit 0) ([e98b8bc](https://github.com/brentbahry/server/commit/e98b8bc563d41f6b2cec9d1064c41d27859e98dd))
+
+
+
+
+
 ## [3.0.8](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.0.7...@proteinjs/server-api@3.0.8) (2026-07-21)
 
 

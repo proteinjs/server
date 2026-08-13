@@ -14,5 +14,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowJs": true
-  }
+  },
+  "exclude": ["node_modules", "dist", "test", "jest.config.js"]
 }
