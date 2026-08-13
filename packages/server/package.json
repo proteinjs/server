@@ -1,6 +1,6 @@
 {
   "name": "@proteinjs/server",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "A server impl",
   "publishConfig": {
     "access": "public"
@@ -22,10 +22,10 @@
     "test": "jest --runInBand"
   },
   "dependencies": {
-    "@proteinjs/event": "^1.0.17",
+    "@proteinjs/event": "^1.0.18",
     "@proteinjs/logger": "^1.0.21",
     "@proteinjs/reflection": "^1.1.12",
-    "@proteinjs/server-api": "^3.1.0",
+    "@proteinjs/server-api": "^3.1.1",
     "@proteinjs/util-node": "^1.10.1",
     "body-parser": "1.19.0",
     "cookie-parser": "1.4.5",
