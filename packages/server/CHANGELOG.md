@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.4.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.3.1...@proteinjs/server@3.4.0) (2026-08-14)
+
+
+### Bug Fixes
+
+* maximum-scale=1 in the viewport meta — iOS auto-zoom on sub-16px input focus left the page zoomed and pannable ([5cef4bb](https://github.com/proteinjs/server/commit/5cef4bbdc633d147ea06385b816fc79115dda708))
+
+
+### Features
+
+* mobile meta tags in the react app shell ([1baa8e1](https://github.com/proteinjs/server/commit/1baa8e10028e5ca71e8b7e6098e29e0207e523bc))
+
+
+
+
+
 ## [3.3.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.3.0...@proteinjs/server@3.3.1) (2026-08-13)
 
 **Note:** Version bump only for package @proteinjs/server
