@@ -7,6 +7,10 @@
  * Markers on stdout (the suite's synchronization points):
  *   FIXTURE_READY          — startServer resolved (the listener is up)
  *   SLOW_REQUEST_STARTED   — the /slow handler is executing (a request is now in flight)
+ *
+ * Also serves /server-timeouts: the LIVE http.Server's keepAliveTimeout/headersTimeout (read off
+ * the request's own socket), so the keep-alive suite asserts the running instance through the
+ * front door instead of re-deriving values from source.
  */
 const expressSession = require('express-session');
 const { startServer } = require('../../dist/generated/index.js');
@@ -25,6 +29,13 @@ startServer({
     // reflection-registered Route of its own: it answers /slow itself (never calls next)
     // after ?ms= of held work, standing in for any long in-flight request.
     beforeRequest: async (request, response, next) => {
+      if (request.path === '/server-timeouts') {
+        // The socket's `server` IS the live http.Server instance — the values the kernel-visible
+        // connection actually runs under, not a copy of the config.
+        const server = request.socket.server;
+        response.status(200).json({ keepAliveTimeout: server.keepAliveTimeout, headersTimeout: server.headersTimeout });
+        return;
+      }
       if (request.path !== '/slow') {
         next();
         return;

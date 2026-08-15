@@ -27,6 +27,21 @@ const logger = new Logger({ name: 'Server' });
 const app = express();
 const server = new HttpServer(app);
 
+// The load balancer in front of this server reuses idle backend connections for up to its idle
+// timeout (GCP-documented: 600s). The backend's keep-alive MUST OUTLIVE that — with Node's default
+// keepAliveTimeout (5s), the server closes an idle connection at the same moment the LB reuses it
+// and the request dies as a 502 (backend_connection_closed_before_data_sent_to_client; log-proven
+// prod incident 2026-08-15). Node additionally requires headersTimeout > keepAliveTimeout, or the
+// same race re-opens on header parsing (a reused connection's headers still arriving when the
+// keep-alive reaper closes the socket). Shutdown is unaffected: GracefulShutdown's drain closes
+// idle keep-alive connections explicitly (closeIdleConnections / closeAllConnections) rather than
+// waiting these timeouts out.
+const LB_IDLE_TIMEOUT_MS = 600_000;
+const KEEP_ALIVE_TIMEOUT_MS = LB_IDLE_TIMEOUT_MS + 20_000; // 620s — exceeds the LB idle timeout
+const HEADERS_TIMEOUT_MS = KEEP_ALIVE_TIMEOUT_MS + 5_000; // 625s — exceeds keepAliveTimeout
+server.keepAliveTimeout = KEEP_ALIVE_TIMEOUT_MS;
+server.headersTimeout = HEADERS_TIMEOUT_MS;
+
 export async function startServer(config: ServerConfig) {
   // First, before any (possibly long) startup work: a SIGTERM must drain gracefully from the
   // moment this process can be part of a rollout, including mid-boot.
