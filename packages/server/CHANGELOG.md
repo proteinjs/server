@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.4.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.4.0...@proteinjs/server@3.4.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* server keep-alive must outlive the LB idle timeout (sporadic 502s) ([049f6df](https://github.com/proteinjs/server/commit/049f6dfc88d8a1725162e5d44b36b01d0f25d8b4))
+
+
+
+
+
 # [3.4.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.3.1...@proteinjs/server@3.4.0) (2026-08-14)
 
 
