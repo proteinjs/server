@@ -7,7 +7,7 @@ import { DevClientBuild } from '../DevClientBuild';
 // Browser-chrome ground colors mirrored from @n3xah/util-ui Theme.tsx getTheme()
 // (lightPalette/darkPalette `background.default`) — proteinjs cannot import n3xah,
 // so the hex values are hard-coded here and must track that file.
-const THEME_COLOR_LIGHT = '#FAFAFB';
+const THEME_COLOR_LIGHT = '#FFFFFF';
 const THEME_COLOR_DARK = '#202020';
 
 export const createReactApp = (serverConfig: ServerConfig) => {
