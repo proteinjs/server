@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.5.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.5.0...@proteinjs/server@3.5.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* passport 0.4.1 -> 0.6.0 + explicit SameSite=Lax on the session cookie ([6fd866c](https://github.com/proteinjs/server/commit/6fd866cb5a55d74602497f80cc04ca8c5c1f893b))
+
+
+
+
+
 # [3.5.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.4.1...@proteinjs/server@3.5.0) (2026-08-19)
 
 
