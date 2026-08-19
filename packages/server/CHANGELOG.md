@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.5.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.4.1...@proteinjs/server@3.5.0) (2026-08-19)
+
+
+### Features
+
+* white canvas — light meta theme-color tracks the new white ground ([537fc84](https://github.com/proteinjs/server/commit/537fc8486e981c13ccd1c82744ebd5cadfc97f3e)), closes [#202020](https://github.com/proteinjs/server/issues/202020)
+
+
+
+
+
 ## [3.4.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.4.0...@proteinjs/server@3.4.1) (2026-08-15)
 
 
