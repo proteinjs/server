@@ -294,6 +294,9 @@ function configureSession(app: express.Express, config: ServerConfig) {
     saveUninitialized: false,
     cookie: {
       maxAge: sixtyDays,
+      // Explicit CSRF posture, not browser-default drift: cross-site subrequests (form POSTs,
+      // iframes, images) never carry the session cookie; top-level navigations still do.
+      sameSite: 'lax',
     },
     rolling: true,
   };
@@ -339,7 +342,9 @@ function initializeAuthentication(authenticate: (username: string, password: str
   });
 
   passport.deserializeUser(function (id, done) {
-    done(null, id);
+    // Identity pass-through: sessions store the user's email directly (see establishSession in
+    // @proteinjs/user-server); the cast bridges @types/passport 1.0.17's `unknown` id.
+    done(null, id as Express.User);
   });
 }
 
@@ -348,7 +353,7 @@ function beforeRequest(app: express.Express, config: ServerConfig) {
     app.use(async (request: express.Request, response: express.Response, next: express.NextFunction) => {
       if (config.authenticate) {
         await new Promise<void>((resolve, reject) => {
-          passport.authenticate('local', function (err, user, info) {
+          passport.authenticate('local', function (err: unknown) {
             if (err) {
               reject(err);
             }

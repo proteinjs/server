@@ -36,6 +36,14 @@ startServer({
         response.status(200).json({ keepAliveTimeout: server.keepAliveTimeout, headersTimeout: server.headersTimeout });
         return;
       }
+      if (request.path === '/session-cookie') {
+        // Touch the session so express-session emits the Set-Cookie header (saveUninitialized is
+        // false — an untouched session never sets a cookie); the session-cookie suite asserts the
+        // attributes on the emitted cookie.
+        request.session.probe = 'set';
+        response.status(200).send('session-cookie-set');
+        return;
+      }
       if (request.path !== '/slow') {
         next();
         return;
