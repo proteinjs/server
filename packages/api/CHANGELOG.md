@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.1.2](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.1.1...@proteinjs/server-api@3.1.2) (2026-08-27)
+
+
+### Bug Fixes
+
+* a request always seeds its OWN session context — kills the keep-alive session-bag bleed ([24f84e3](https://github.com/brentbahry/server/commit/24f84e38cdc4317e5e2c5ef819ed8d58289cfc5b))
+
+
+
+
+
 ## [3.1.1](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.1.0...@proteinjs/server-api@3.1.1) (2026-08-13)
 
 **Note:** Version bump only for package @proteinjs/server-api
