@@ -33,6 +33,15 @@ export interface SessionDataStorage extends Loadable {
   priority?: number;
   setData(data: SessionData): void;
   getData(): SessionData;
+  /**
+   * Drop the CURRENT execution context's session data so the next `setData` seeds fresh.
+   * A REQUEST BOUNDARY concern: on a reused keep-alive socket a request's dispatch can be
+   * born inside the previous request's async lineage, and first-write-wins `setData` then
+   * silently drops the new request's seed — the request runs (and server-renders) as the
+   * PRIOR request's user. Optional: only storages with cross-context inheritance need it;
+   * single-slot test fakes get identical semantics from `setData` alone.
+   */
+  clearData?(): void;
 }
 
 export class Session {
@@ -42,6 +51,11 @@ export class Session {
 
   static setData(data: SessionData) {
     getSessionDataStorage().setData(data);
+  }
+
+  /** Drop the current execution context's session data (see SessionDataStorage.clearData). */
+  static clearData() {
+    getSessionDataStorage().clearData?.();
   }
 
   static getDataByKey<T>(sessionDataCacheKey: string): T | undefined {

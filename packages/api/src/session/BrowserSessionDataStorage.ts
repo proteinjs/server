@@ -12,4 +12,8 @@ export class BrowserSessionDataStorage implements SessionDataStorage {
   getData(): SessionData {
     return proteinjs['sessionData'];
   }
+
+  clearData(): void {
+    delete proteinjs['sessionData'];
+  }
 }

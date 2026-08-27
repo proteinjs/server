@@ -87,6 +87,13 @@ function wrapRoute(
     for (const sessionDataCache of getSessionDataCaches()) {
       sessionData.data[sessionDataCache.key] = await sessionDataCache.create(sessionData.sessionId, sessionData.user);
     }
+    // A request always seeds ITS OWN session context: on a reused keep-alive socket this
+    // dispatch is born inside the previous request's async lineage (the storage's init hook
+    // copies bags onto descendants), and first-write-wins setData would silently drop this
+    // request's seed — the request then runs (and server-renders proteinjs.sessionData) as
+    // the PRIOR request's user (observed 2026-08-26: stale home greeting after a /dev/login
+    // account switch; roster correct, greeting wrong). Clear the inherited entry first.
+    Session.clearData();
     Session.setData(sessionData);
 
     if (shouldLogRequest(request, config)) {
