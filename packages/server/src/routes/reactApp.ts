@@ -24,6 +24,13 @@ export const createReactApp = (serverConfig: ServerConfig) => {
       }
 
       const helmet = ReactHelmet.renderStatic();
+      // The page must ALWAYS revalidate (found live 2026-09-01, the mobile-app stale-page
+      // investigation): without an explicit policy, HTTP heuristic caching applies (RFC 9111
+      // §4.2.2) — WKWebView in particular can serve the cached page without revalidating,
+      // across app force-quits, pinning stale bundle POINTERS long after a deploy. The hashed
+      // bundles under /static keep their long cache (a fresh page always points at fresh
+      // hashes); `no-cache` + the ETag express already stamps = a cheap 304 on every load.
+      response.set('Cache-Control', 'no-cache');
       response.send(`<!DOCTYPE html>
                 <html ${helmet.htmlAttributes}>
                     <head>

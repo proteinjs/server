@@ -54,6 +54,10 @@ startServer({
       response.status(200).send('slow-done');
     },
   },
+  // A bundle pointer so the '*' react-app route serves its HTML — the html-cache-control
+  // suite asserts response headers on the page the app actually ships. No staticContentDir:
+  // nothing needs the bundle to resolve, only the page response to render.
+  staticContent: { bundlePaths: ['bundles/app.test.js'] },
   shutdown: {
     drainDelayMs: process.env.FIXTURE_DRAIN_DELAY_MS ? Number(process.env.FIXTURE_DRAIN_DELAY_MS) : undefined,
     drainTimeoutMs: process.env.FIXTURE_DRAIN_TIMEOUT_MS ? Number(process.env.FIXTURE_DRAIN_TIMEOUT_MS) : undefined,
