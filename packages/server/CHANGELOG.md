@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.5.3](https://github.com/proteinjs/server/compare/@proteinjs/server@3.5.2...@proteinjs/server@3.5.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* **server:** the react-app HTML response says Cache-Control: no-cache — the page always revalidates (found live 2026-09-01, the mobile-app stale-page investigation). The '*' route sent HTML with an ETag but NO Cache-Control: with no explicit policy, HTTP heuristic caching applies (RFC 9111 §4.2.2) and WKWebView in particular can serve the cached page without revalidating — across app force-quits — pinning stale bundle POINTERS long after a deploy. The hashed bundles under /static keep their long cache (a fresh page always points at fresh hashes); the PAGE must always revalidate. no-cache + the ETag express already stamps = a cheap 304 on every load, never a stale page. Red-before-green: htmlCacheControl.test.ts (front door — a real spawned server, the LB's X-Forwarded-Proto topology) read cache-control undefined at the pre-fix dist (2 red), green after; / and /chat both pinned (the catch-all is the one HTML owner). Fixture gains a bundlePaths pointer so the react-app route serves its page; full estate 5 suites / 11 green (9 pre-existing). ([076536f](https://github.com/proteinjs/server/commit/076536f158ce1c91b073061345fe7aae802b4f38))
+
+
+
+
+
 ## [3.5.2](https://github.com/proteinjs/server/compare/@proteinjs/server@3.5.1...@proteinjs/server@3.5.2) (2026-08-27)
 
 
