@@ -1,6 +1,0 @@
-{
-  "branch": "feat/shutdown-holds",
-  "packages": ["server", "api"],
-  "suites": ["packages/server/test/holdSeam.test.ts", "packages/server/test/gracefulShutdown.test.ts"],
-  "removes": []
-}
