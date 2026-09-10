@@ -37,7 +37,8 @@ export interface ServerConfig {
    * Graceful-shutdown tuning (the SIGTERM drain — see `GracefulShutdown` in @proteinjs/server).
    * On SIGTERM the server flips `/health-check` to 503, keeps accepting connections for
    * `drainDelayMs` so load balancers observe the failing readiness and de-register, then closes
-   * the listener, lets in-flight requests complete (bounded by `drainTimeoutMs`), and exits 0.
+   * the listener, waits for its holds (bounded by `turnDrainMs`), lets in-flight requests
+   * complete (bounded by `drainTimeoutMs`), and exits 0.
    */
   shutdown?: {
     /**
@@ -50,10 +51,19 @@ export interface ServerConfig {
     drainDelayMs?: number;
     /**
      * Bound on waiting for in-flight requests after the listener closes; past it the remaining
-     * connections are force-closed. The process exits 0 either way. The deployment's
-     * termination grace must exceed `drainDelayMs + drainTimeoutMs`. Default: 30000.
+     * connections are force-closed. The process exits 0 either way. Default: 30000.
      */
     drainTimeoutMs?: number;
+    /**
+     * Bound on waiting for the process's HOLDS after the listener closes (`GracefulShutdown.hold`
+     * in @proteinjs/server): work that must not die with the process and that no connection
+     * represents — the canonical holder is a chat turn whose client disconnected mid-turn (the
+     * response detached, the model still writing, nothing persisted yet). Past the bound every
+     * hold still outstanding is logged by label and abandoned; the drain then proceeds. The
+     * deployment's termination grace must exceed `drainDelayMs + turnDrainMs + drainTimeoutMs`
+     * (plus any preStop hook). Default: 240000 — a chat turn runs minutes.
+     */
+    turnDrainMs?: number;
   };
   request?: {
     disableRequestLogging?: boolean;

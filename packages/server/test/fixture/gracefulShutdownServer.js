@@ -2,18 +2,22 @@
  * Test fixture: a REAL @proteinjs/server (the built dist — the same code prod runs) with a
  * deliberately slow endpoint, so the graceful-shutdown suite can hold a request in flight
  * while it signals the process. Run with:
- *   FIXTURE_PORT=<port> [FIXTURE_DRAIN_DELAY_MS=..] [FIXTURE_DRAIN_TIMEOUT_MS=..] node gracefulShutdownServer.js
+ *   FIXTURE_PORT=<port> [FIXTURE_DRAIN_DELAY_MS=..] [FIXTURE_DRAIN_TIMEOUT_MS=..] [FIXTURE_TURN_DRAIN_MS=..] node gracefulShutdownServer.js
  *
  * Markers on stdout (the suite's synchronization points):
  *   FIXTURE_READY          — startServer resolved (the listener is up)
  *   SLOW_REQUEST_STARTED   — the /slow handler is executing (a request is now in flight)
+ *   HOLD_ACQUIRED <label>  — /hold took a process hold (GracefulShutdown.hold) that outlives
+ *                            its request: the response ends at once, the hold releases itself
+ *                            ?ms= later — a detached chat turn's shape (no connection, work live)
+ *   HOLD_RELEASED <label>  — that hold released
  *
  * Also serves /server-timeouts: the LIVE http.Server's keepAliveTimeout/headersTimeout (read off
  * the request's own socket), so the keep-alive suite asserts the running instance through the
  * front door instead of re-deriving values from source.
  */
 const expressSession = require('express-session');
-const { startServer } = require('../../dist/generated/index.js');
+const { startServer, GracefulShutdown } = require('../../dist/generated/index.js');
 
 const port = Number(process.env.FIXTURE_PORT);
 if (!port) {
@@ -44,6 +48,20 @@ startServer({
         response.status(200).send('session-cookie-set');
         return;
       }
+      if (request.path === '/hold') {
+        // A hold that OUTLIVES its request — the detached-turn shape the drain must wait for:
+        // the response ends now (no connection remains), the work stays live for ?ms=.
+        const label = String(request.query.label ?? 'fixture-hold');
+        const ms = Number(request.query.ms ?? 5000);
+        const release = GracefulShutdown.hold(label, { source: 'fixture', ms });
+        console.log(`HOLD_ACQUIRED ${label}`);
+        setTimeout(() => {
+          release();
+          console.log(`HOLD_RELEASED ${label}`);
+        }, ms);
+        response.status(200).send('held');
+        return;
+      }
       if (request.path !== '/slow') {
         next();
         return;
@@ -61,5 +79,6 @@ startServer({
   shutdown: {
     drainDelayMs: process.env.FIXTURE_DRAIN_DELAY_MS ? Number(process.env.FIXTURE_DRAIN_DELAY_MS) : undefined,
     drainTimeoutMs: process.env.FIXTURE_DRAIN_TIMEOUT_MS ? Number(process.env.FIXTURE_DRAIN_TIMEOUT_MS) : undefined,
+    turnDrainMs: process.env.FIXTURE_TURN_DRAIN_MS ? Number(process.env.FIXTURE_TURN_DRAIN_MS) : undefined,
   },
 }).then(() => console.log('FIXTURE_READY'));

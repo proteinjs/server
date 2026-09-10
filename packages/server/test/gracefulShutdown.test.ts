@@ -13,6 +13,11 @@ import { ChildProcess, spawn } from 'child_process';
  *             idle keep-alives are closed, and the process exits 0 — bounded by
  *             shutdown.drainTimeoutMs (past it, remaining connections are force-closed and
  *             the exit is still 0).
+ *             HOLDS (GracefulShutdown.hold): work no connection represents — a chat turn whose
+ *             client disconnected (the 2026-09-05 prod kill, plans/FREE_AGENT.md §M.14) — keeps
+ *             the process alive past the connection drain until it releases, bounded by
+ *             shutdown.turnDrainMs; past THAT bound the holds still outstanding are logged by
+ *             label and abandoned, and the exit is still 0.
  *   SIGINT  → immediate exit 0 (dev ctrl-C: fast, quiet).
  *   exit 86 → RESTART_REQUEST_EXIT_CODE, untouched by this feature: process.exit(86) is not
  *             signal-driven (ServePackageSupervisor's respawn contract rides it).
@@ -101,9 +106,70 @@ describe('graceful shutdown', () => {
     expect(exit).toEqual({ code: 0, signal: null });
     expect(Date.now() - sigintAt).toBeLessThan(2000); // no drain delay on the fast path
   }, 30000);
+
+  describe('holds — work no connection represents (a detached chat turn)', () => {
+    it('SIGTERM: a hold whose request already ended keeps the process alive past the connection drain; its release lets the exit proceed', async () => {
+      // No delay, a short connection bound, a long hold bound: the ONLY thing that can keep this
+      // process alive after SIGTERM is the hold.
+      fixture = await startFixture({ drainDelayMs: 0, drainTimeoutMs: 1000, turnDrainMs: 20000 });
+
+      // The detached-turn shape: the request ends immediately (no connection remains), the work
+      // it started stays live for 5s and releases its hold when done.
+      const held = await request(fixture.port, '/hold?label=chat-turn:detached-turn&ms=5000');
+      expect(held).toEqual({ status: 200, body: 'held' });
+      await fixture.waitForMarker('HOLD_ACQUIRED chat-turn:detached-turn');
+
+      const sigtermAt = Date.now();
+      fixture.child.kill('SIGTERM');
+
+      // 1. Past the connection drain (nothing was in flight — it completes at once; the listener
+      //    is closed) the process is STILL RUNNING: the hold is what keeps it.
+      await sleep(2500);
+      expect(fixture.child.exitCode).toBeNull();
+      expect(fixture.child.signalCode).toBeNull();
+      await expect(request(fixture.port, '/health-check')).rejects.toMatchObject({
+        code: expect.stringMatching(/ECONNREFUSED|ECONNRESET/),
+      });
+      expect(fixture.stdout()).toContain('waiting for 1 hold(s) to release (bound: 20000ms)');
+
+      // 2. The work finishes and releases; the exit follows the RELEASE (~5s), not the 20s bound.
+      const exit = await fixture.exited;
+      expect(exit).toEqual({ code: 0, signal: null });
+      const elapsed = Date.now() - sigtermAt;
+      expect(elapsed).toBeGreaterThanOrEqual(4500);
+      expect(elapsed).toBeLessThan(12000);
+      expect(fixture.stdout()).toContain('HOLD_RELEASED chat-turn:detached-turn');
+      expect(fixture.stdout()).toContain('Every hold released');
+    }, 40000);
+
+    it('SIGTERM: the hold drain is BOUNDED — past turnDrainMs the outstanding holds are logged by label, abandoned, and the exit is still 0', async () => {
+      fixture = await startFixture({ drainDelayMs: 0, drainTimeoutMs: 1000, turnDrainMs: 3000 });
+
+      // A hold that would outlive the bound by far.
+      const held = await request(fixture.port, '/hold?label=chat-turn:abandoned-turn&ms=60000');
+      expect(held.status).toBe(200);
+      await fixture.waitForMarker('HOLD_ACQUIRED chat-turn:abandoned-turn');
+
+      const sigtermAt = Date.now();
+      fixture.child.kill('SIGTERM');
+
+      const exit = await fixture.exited;
+      expect(exit).toEqual({ code: 0, signal: null });
+      const elapsed = Date.now() - sigtermAt;
+      expect(elapsed).toBeGreaterThanOrEqual(3000); // the bound was actually served
+      expect(elapsed).toBeLessThan(9000); // ...and it ended the wait, not the 60s hold
+      // The abandoned work is NAMED — the line the 2026-09-05 kill never left behind.
+      expect(fixture.stdout()).toContain('abandoning 1 hold(s): chat-turn:abandoned-turn');
+      expect(fixture.stdout()).not.toContain('HOLD_RELEASED');
+    }, 30000);
+  });
 });
 
-async function startFixture(shutdown: { drainDelayMs: number; drainTimeoutMs: number }): Promise<Fixture> {
+async function startFixture(shutdown: {
+  drainDelayMs: number;
+  drainTimeoutMs: number;
+  turnDrainMs?: number;
+}): Promise<Fixture> {
   const port = await ephemeralPort();
   // Scrub the env vars startServer reads (dev machines export some of these): the fixture's
   // behavior must come from its own config only.
@@ -119,6 +185,7 @@ async function startFixture(shutdown: { drainDelayMs: number; drainTimeoutMs: nu
       FIXTURE_PORT: String(port),
       FIXTURE_DRAIN_DELAY_MS: String(shutdown.drainDelayMs),
       FIXTURE_DRAIN_TIMEOUT_MS: String(shutdown.drainTimeoutMs),
+      ...(shutdown.turnDrainMs !== undefined ? { FIXTURE_TURN_DRAIN_MS: String(shutdown.turnDrainMs) } : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
