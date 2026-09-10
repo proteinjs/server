@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.2.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.1.2...@proteinjs/server-api@3.2.0) (2026-09-10)
+
+
+### Features
+
+* **server:** GracefulShutdown holds — the SIGTERM drain waits for work no connection represents (a detached chat turn), bounded by shutdown.turnDrainMs ([b534d68](https://github.com/brentbahry/server/commit/b534d68ab14f925a686cb338466ebabd4b40ef75))
+
+
+
+
+
 ## [3.1.2](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.1.1...@proteinjs/server-api@3.1.2) (2026-08-27)
 
 
