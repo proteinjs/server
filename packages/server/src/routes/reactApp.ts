@@ -24,6 +24,14 @@ export const createReactApp = (serverConfig: ServerConfig) => {
       }
 
       const helmet = ReactHelmet.renderStatic();
+      // ONE boot round: the server-rendered scripts (each a settings read for the logged-in user)
+      // and the bundle listing run concurrently — the page's TTFB is the SLOWEST of them, not their
+      // sum (measured on a phone: 5–6 reads awaited one after another sat in front of every byte
+      // of the page).
+      const [serverRenderedScripts, bundleUrls] = await Promise.all([
+        serverRenderedScriptTags(),
+        bundleScriptUrls(serverConfig),
+      ]);
       // The page must ALWAYS revalidate (found live 2026-09-01, the mobile-app stale-page
       // investigation): without an explicit policy, HTTP heuristic caching applies (RFC 9111
       // §4.2.2) — WKWebView in particular can serve the cached page without revalidating,
@@ -39,6 +47,7 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                         <meta name='theme-color' content='${THEME_COLOR_LIGHT}' media='(prefers-color-scheme: light)'>
                         <meta name='theme-color' content='${THEME_COLOR_DARK}' media='(prefers-color-scheme: dark)'>
                         <link href='${serverConfig.staticContent?.faviconPath ? path.join('/static/', serverConfig.staticContent.faviconPath) : ''}' rel='icon' type='image/png' />
+                        ${bundlePreloadTags(bundleUrls)}
                         ${helmet.title.toString()}
                         ${helmet.meta.toString()}
                         ${helmet.link.toString()}
@@ -46,52 +55,71 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                     <body ${helmet.bodyAttributes.toString()}>
                         <div id='app'></div>
                         <script>proteinjs = {};</script>
-                        ${await serverRenderedScriptTags()}
-                        ${await bundleScriptTags(serverConfig)}
+                        ${serverRenderedScripts}
+                        ${bundleScriptTags(bundleUrls)}
                     </body>
                 </html>`);
     },
   };
 };
 
-async function bundleScriptTags(serverConfig: ServerConfig) {
+/**
+ * The bundle URLs the page loads, in load order. Dev: the entrypoint's files as the LAST compile
+ * recorded them (DevClientBuild — the page follows the chunk graph the webpack config declares),
+ * each stamped `?v=<hash>` so the page is verifiable against /dev/build-info (matching hash =
+ * provably running the current build). Prod: the configured bundle paths, or every `.js` under the
+ * bundles dir in a stable (sorted) order — webpack's runtime registers chunks in any order.
+ */
+async function bundleScriptUrls(serverConfig: ServerConfig): Promise<string[]> {
   if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir)) {
-    return;
+    return [];
   }
 
-  const scriptTags: string[] = [];
   if (process.env.DEVELOPMENT && !process.env.DISABLE_HOT_CLIENT_BUILDS) {
-    // `?v=<hash>` stamps the page with the compile it was served against: it deterministically
-    // busts the browser cache on new builds, and lets tooling verify a live page against
-    // /dev/build-info (matching hash = provably running the current build).
-    const stamp = DevClientBuild.get() ? `?v=${DevClientBuild.get()!.hash}` : '';
-    scriptTags.push(`<script src='${path.join('/static/', 'app.js')}${stamp}'></script>`);
-    scriptTags.push(`<script src='${path.join('/static/', 'vendor.js')}${stamp}'></script>`);
-  } else if (serverConfig.staticContent?.bundlePaths) {
-    for (const bundlePath of serverConfig.staticContent.bundlePaths) {
-      scriptTags.push(`<script src='${path.join('/static/', bundlePath)}'></script>`);
+    const build = DevClientBuild.get();
+    if (!build) {
+      // start() gates the listen READY on the first compile, so a page is never served before
+      // a build is recorded; a missing record is a wiring fault, said aloud rather than papered.
+      throw new Error('the dev client build has not been recorded yet — no bundle to serve');
     }
-  } else if (serverConfig.staticContent?.bundlesDir && serverConfig.staticContent?.staticContentDir) {
-    const resolvedBundlesDir = path.join(
-      serverConfig.staticContent.staticContentDir,
-      serverConfig.staticContent.bundlesDir
-    );
-    const filePaths = await Fs.getFilePathsMatchingGlob(resolvedBundlesDir, '**/*.js');
-    for (const filePath of filePaths) {
-      const relativePath = path.relative(serverConfig.staticContent.staticContentDir, filePath);
-      scriptTags.push(`<script src='${path.join('/static/', relativePath)}'></script>`);
-    }
+    return build.assets.map((asset) => `${path.join('/static/', asset)}?v=${build.hash}`);
   }
 
-  return scriptTags.join('\n');
+  if (serverConfig.staticContent?.bundlePaths) {
+    return serverConfig.staticContent.bundlePaths.map((bundlePath) => path.join('/static/', bundlePath));
+  }
+
+  if (serverConfig.staticContent?.bundlesDir && serverConfig.staticContent?.staticContentDir) {
+    const staticContentDir = serverConfig.staticContent.staticContentDir;
+    const resolvedBundlesDir = path.join(staticContentDir, serverConfig.staticContent.bundlesDir);
+    const filePaths = await Fs.getFilePathsMatchingGlob(resolvedBundlesDir, '**/*.js');
+    return filePaths
+      .map((filePath) => path.join('/static/', path.relative(staticContentDir, filePath)))
+      .sort();
+  }
+
+  return [];
 }
 
-async function serverRenderedScriptTags() {
-  const scripts = getServerRenderedScripts();
-  const scriptTags: string[] = [];
-  for (const script of scripts) {
-    scriptTags.push(`<script>${await script.script()}</script>`);
-  }
+/**
+ * `defer`: the bundles download in parallel WHILE the HTML parses and execute in document order
+ * once it has — a synchronous `<script src>` blocked the parser on every byte of the vendor chunk,
+ * and on iOS the previous page stayed painted (and tappable) under the user's thumb until the new
+ * document's first paint. The inline server-rendered scripts above them still run at parse time,
+ * so `proteinjs[...]` globals exist before any bundle executes.
+ */
+function bundleScriptTags(bundleUrls: string[]): string {
+  return bundleUrls.map((url) => `<script defer src='${url}'></script>`).join('\n');
+}
 
-  return scriptTags.join('\n');
+/** `<link rel=preload>` in the head: the fetches start from the first bytes of the document. */
+function bundlePreloadTags(bundleUrls: string[]): string {
+  return bundleUrls.map((url) => `<link rel='preload' href='${url}' as='script'>`).join('\n');
+}
+
+/** Every server-rendered script rendered CONCURRENTLY; emitted in registration order. */
+async function serverRenderedScriptTags(): Promise<string> {
+  const scripts = getServerRenderedScripts();
+  const rendered = await Promise.all(scripts.map((script) => script.script()));
+  return rendered.map((script) => `<script>${script}</script>`).join('\n');
 }

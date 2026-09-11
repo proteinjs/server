@@ -13,6 +13,12 @@ export type DevClientBuildInfo = {
   builtAt: string;
   durationMs?: number;
   errorCount: number;
+  /**
+   * The entrypoint's script files (`app.js`, `vendor.js`, …) in the compile's own load order —
+   * the dev page's bundle tags are rendered from THIS list (reactApp.ts), so the page follows the
+   * chunk graph the webpack config declares instead of a hard-coded pair of names.
+   */
+  assets: string[];
 };
 
 export class DevClientBuild {
