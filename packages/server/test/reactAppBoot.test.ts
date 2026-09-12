@@ -53,7 +53,10 @@ const flushMicrotasks = async () => {
 
 describe('the react app page boots in one round', () => {
   let tmp: string;
-  const env = { DEVELOPMENT: process.env.DEVELOPMENT, DISABLE_HOT_CLIENT_BUILDS: process.env.DISABLE_HOT_CLIENT_BUILDS };
+  const env = {
+    DEVELOPMENT: process.env.DEVELOPMENT,
+    DISABLE_HOT_CLIENT_BUILDS: process.env.DISABLE_HOT_CLIENT_BUILDS,
+  };
 
   beforeEach(() => {
     scripts.length = 0;
@@ -104,7 +107,9 @@ describe('the react app page boots in one round', () => {
     await flushMicrotasks();
     release.a();
     await done;
-    const order = ['window.a = 1;', 'window.b = 1;', 'window.c = 1;'].map((s) => rendered.html.indexOf(`<script>${s}</script>`));
+    const order = ['window.a = 1;', 'window.b = 1;', 'window.c = 1;'].map((s) =>
+      rendered.html.indexOf(`<script>${s}</script>`)
+    );
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((x, y) => x - y));
     // The globals object the scripts write into is declared ahead of them.
@@ -149,7 +154,9 @@ describe('the react app page boots in one round', () => {
     const { html } = await render(prodStaticContent());
     const body = html.slice(html.indexOf('<body'));
     const head = html.slice(0, html.indexOf('<body'));
-    const tags = ['react.js', 'vendor.js', 'app.js'].map((asset) => body.indexOf(`<script defer src='/static/${asset}?v=cafe0123'></script>`));
+    const tags = ['react.js', 'vendor.js', 'app.js'].map((asset) =>
+      body.indexOf(`<script defer src='/static/${asset}?v=cafe0123'></script>`)
+    );
     // Pre-fix red: two hard-coded names (app.js, vendor.js), no react.js, no defer.
     expect(tags.every((i) => i >= 0)).toBe(true);
     expect(tags).toEqual([...tags].sort((x, y) => x - y));

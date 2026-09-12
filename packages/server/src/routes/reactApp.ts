@@ -93,9 +93,7 @@ async function bundleScriptUrls(serverConfig: ServerConfig): Promise<string[]> {
     const staticContentDir = serverConfig.staticContent.staticContentDir;
     const resolvedBundlesDir = path.join(staticContentDir, serverConfig.staticContent.bundlesDir);
     const filePaths = await Fs.getFilePathsMatchingGlob(resolvedBundlesDir, '**/*.js');
-    return filePaths
-      .map((filePath) => path.join('/static/', path.relative(staticContentDir, filePath)))
-      .sort();
+    return filePaths.map((filePath) => path.join('/static/', path.relative(staticContentDir, filePath))).sort();
   }
 
   return [];
