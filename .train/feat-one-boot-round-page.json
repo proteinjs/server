@@ -1,6 +1,0 @@
-{
-  "branch": "feat/one-boot-round-page",
-  "packages": ["server"],
-  "suites": ["packages/server/test/reactAppBoot.test.ts"],
-  "removes": []
-}
