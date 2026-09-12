@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.7.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.6.0...@proteinjs/server@3.7.0) (2026-09-12)
+
+
+### Features
+
+* **server:** the react app page boots in one round — the server-rendered scripts render concurrently (emitted in registration order), the bundles are deferred and preloaded from the head, and the dev page renders the compile's own entrypoint files (DevClientBuild.assets) stamped ?v=<hash> instead of a hard-coded app.js + vendor.js pair ([206412a](https://github.com/proteinjs/server/commit/206412a0f4176d0052d3ed95b24c4ce5c08c5e06))
+
+
+
+
+
 # [3.6.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.5.3...@proteinjs/server@3.6.0) (2026-09-10)
 
 
