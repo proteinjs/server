@@ -1,0 +1,6 @@
+{
+  "branch": "chore/generic-wording",
+  "packages": ["server"],
+  "suites": ["packages/server/test/gracefulShutdown.test.ts"],
+  "removes": []
+}

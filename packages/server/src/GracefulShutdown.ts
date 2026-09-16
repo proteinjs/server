@@ -10,8 +10,8 @@ export type HoldRelease = () => void;
 export type Hold = { label: string; context?: Record<string, unknown> };
 
 /**
- * Follows the process's holds as they come and go — the dev supervisor's lease projection
- * (@n3xah/util-server's ServePackageHold) is the one consumer; it never decides anything here.
+ * Follows the process's holds as they come and go — a dev supervisor's lease projection is the
+ * one consumer; it never decides anything here.
  */
 export type HoldObserver = { acquired?: (label: string) => void; released?: (label: string) => void };
 
@@ -52,7 +52,7 @@ export type HoldObserver = { acquired?: (label: string) => void; released?: (lab
  * Why holds and not connections: the 2026-09-05 prod kill — a phone locked mid-turn, the route
  * detached the dead response and the turn ran on to persist, GKE's autoscaler evicted the pod,
  * and this drain saw NO connection in flight, so `process.exit(0)` ran 5 s after SIGTERM with the
- * model call 32 s in. Nothing persisted, nothing logged (plans/FREE_AGENT.md §M.14).
+ * model call 32 s in. Nothing persisted, nothing logged.
  *
  * A SIGTERM before the listener is open (mid-boot kill) exits 0 immediately — nothing is
  * registered anywhere and nothing is in flight.
