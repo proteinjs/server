@@ -15,7 +15,12 @@
  * Also serves /server-timeouts: the LIVE http.Server's keepAliveTimeout/headersTimeout (read off
  * the request's own socket), so the keep-alive suite asserts the running instance through the
  * front door instead of re-deriving values from source.
+ *
+ * Also serves the request-error suite: /static/<file> from ./static (the framework's own static
+ * router — a conditional request the file cannot satisfy is refused by it), and /fail, a
+ * middleware handing an error to next() — the shape of any pre-route failure.
  */
+const path = require('path');
 const expressSession = require('express-session');
 const { startServer, GracefulShutdown } = require('../../dist/generated/index.js');
 
@@ -62,6 +67,12 @@ startServer({
         response.status(200).send('held');
         return;
       }
+      if (request.path === '/fail') {
+        // A middleware handing an error to next(): what the pipeline does with it (the answer,
+        // the log line) is the request-error suite's contract.
+        next(new Error('fixture failure'));
+        return;
+      }
       if (request.path !== '/slow') {
         next();
         return;
@@ -73,9 +84,11 @@ startServer({
     },
   },
   // A bundle pointer so the '*' react-app route serves its HTML — the html-cache-control
-  // suite asserts response headers on the page the app actually ships. No staticContentDir:
-  // nothing needs the bundle to resolve, only the page response to render.
-  staticContent: { bundlePaths: ['bundles/app.test.js'] },
+  // suite asserts response headers on the page the app actually ships (nothing needs the
+  // bundle itself to resolve). The static dir mounts the framework's own /static/ router over
+  // ./static, so the request-error suite can ask it for a real file under a condition the file
+  // cannot satisfy.
+  staticContent: { bundlePaths: ['bundles/app.test.js'], staticContentDir: path.join(__dirname, 'static') },
   shutdown: {
     drainDelayMs: process.env.FIXTURE_DRAIN_DELAY_MS ? Number(process.env.FIXTURE_DRAIN_DELAY_MS) : undefined,
     drainTimeoutMs: process.env.FIXTURE_DRAIN_TIMEOUT_MS ? Number(process.env.FIXTURE_DRAIN_TIMEOUT_MS) : undefined,

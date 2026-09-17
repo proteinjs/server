@@ -21,6 +21,7 @@ import { Logger } from '@proteinjs/logger';
 import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
 import { DevClientBuild } from './DevClientBuild';
 import { GracefulShutdown } from './GracefulShutdown';
+import { RequestErrorHandler } from './RequestErrorHandler';
 
 const staticContentPath = '/static/';
 const logger = new Logger({ name: 'Server' });
@@ -73,6 +74,7 @@ export async function startServer(config: ServerConfig) {
 
   loadDefaultStarRoute(routes, app, config);
   afterRequest(app, config);
+  handleRequestErrors(app);
   await initializeSocketIO(app, server);
 
   await runStartupTasks('after server config');
@@ -389,6 +391,16 @@ function afterRequest(app: express.Express, config: ServerConfig) {
   if (config.request?.afterRequest) {
     app.use(config.request.afterRequest);
   }
+}
+
+/**
+ * Registered LAST: an express error middleware handles the errors of every layer registered
+ * before it, so this one seat covers the whole pipeline — the body parsers, the static router,
+ * the routes, and the consumer's own request middlewares. Without it express's default handler
+ * prints each error's stack to stderr with nothing about the request (see RequestErrorHandler).
+ */
+function handleRequestErrors(app: express.Express) {
+  app.use(new RequestErrorHandler().middleware());
 }
 
 async function initializeSocketIO(app: express.Express, server: HttpServer) {
