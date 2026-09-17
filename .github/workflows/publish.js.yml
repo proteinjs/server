@@ -39,6 +39,10 @@ jobs:
         with:
           node-version: '22'
   
+      - name: CI glue self-test (LockFloors.js)
+        # node:test, needs no install; fails the job before any minute is spent on install/build.
+        run: node --test .github/scripts/LockFloors.test.js
+
       - name: Setup NPM authentication
         run: |
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
@@ -98,3 +102,32 @@ jobs:
           npx lerna publish --yes --no-private
         env:
           NPM_TOKEN: ${{secrets.NPM_TOKEN}}
+
+      - name: Re-stamp the consumer locks for the mint
+        # lerna's release commit raises each sibling consumer's floor when a package it depends on
+        # is published from this repo (packages/server: `@proteinjs/server-api` ^3.2.0 -> ^3.3.0)
+        # and mirrors the range into the lock's root block — lerna 8.1.2's
+        # update-lockfile-version.js is a JSON rewrite, and its only `npm install
+        # --package-lock-only` runs on the ROOT lock, which declares no package. The lock's
+        # INSTALLED entry — the pre-publish stamp the build's `npm i` wrote and the lock commit
+        # above shipped — stays at the old version, so main refuses `npm ci` in every consumer
+        # (EUSAGE: "lock file's @proteinjs/server-api@3.2.0 does not satisfy
+        # @proteinjs/server-api@3.3.0") until someone re-stamps by hand. Now that the registry
+        # serves the mint: LockFloors.js --restamp resolves the torn trees only (`npm i
+        # --package-lock-only` with this job's npm 10 — lock stamps are npm-major dependent), proves
+        # every tree coherent, and the locks ride main as the mint's second commit; a mint that
+        # moved no consumer floor commits nothing. Best-effort by design (continue-on-error): the
+        # packages are published, so a registry still not serving the mint after three rounds leaves
+        # main as lerna left it, this step red, the job green; `node .github/scripts/LockFloors.js
+        # --restamp` under npm 10, committed, is the hand recipe.
+        if: steps.tip.outputs.is_tip == 'true'
+        continue-on-error: true
+        run: |
+          node .github/scripts/LockFloors.js --restamp
+          git add -u -- package-lock.json '*/package-lock.json'
+          if git diff --staged --quiet; then
+            echo "every lock agrees with the mint — nothing to commit."
+          else
+            git commit -m "chore(locks): consumer locks re-stamped for the mint [skip ci]"
+            git push origin HEAD:main
+          fi
