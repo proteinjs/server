@@ -1,6 +1,7 @@
 import path from 'path';
+import express from 'express';
 import ReactHelmet from 'react-helmet';
-import { ServerConfig, getServerRenderedScripts } from '@proteinjs/server-api';
+import { ServerConfig, getServerRenderedHeadTags, getServerRenderedScripts } from '@proteinjs/server-api';
 import { Fs } from '@proteinjs/util-node';
 import { DevClientBuild } from '../DevClientBuild';
 
@@ -28,9 +29,10 @@ export const createReactApp = (serverConfig: ServerConfig) => {
       // and the bundle listing run concurrently — the page's TTFB is the SLOWEST of them, not their
       // sum (measured on a phone: 5–6 reads awaited one after another sat in front of every byte
       // of the page).
-      const [serverRenderedScripts, bundleUrls] = await Promise.all([
+      const [serverRenderedScripts, bundleUrls, headTags] = await Promise.all([
         serverRenderedScriptTags(),
         bundleScriptUrls(serverConfig),
+        serverRenderedHeadTags(request),
       ]);
       // The page must ALWAYS revalidate (found live 2026-09-01, the mobile-app stale-page
       // investigation): without an explicit policy, HTTP heuristic caching applies (RFC 9111
@@ -51,6 +53,7 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                         ${helmet.title.toString()}
                         ${helmet.meta.toString()}
                         ${helmet.link.toString()}
+                        ${headTags}
                     </head>
                     <body ${helmet.bodyAttributes.toString()}>
                         <div id='app'></div>
@@ -120,4 +123,14 @@ async function serverRenderedScriptTags(): Promise<string> {
   const scripts = getServerRenderedScripts();
   const rendered = await Promise.all(scripts.map((script) => script.script()));
   return rendered.map((script) => `<script>${script}</script>`).join('\n');
+}
+
+/**
+ * Every server-rendered head tag rendered CONCURRENTLY for this request (the same one round the
+ * scripts ride); emitted in registration order, an empty render dropped.
+ */
+async function serverRenderedHeadTags(request: express.Request): Promise<string> {
+  const tags = getServerRenderedHeadTags();
+  const rendered = await Promise.all(tags.map((tag) => tag.headTag(request)));
+  return rendered.filter((tag) => tag.length > 0).join('\n');
 }

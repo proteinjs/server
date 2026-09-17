@@ -9,4 +9,5 @@ export * from './src/cacheKeys';
 export * from './src/EnvInfo';
 export * from './src/EnvRepo';
 export * from './src/ServerRenderedScript';
+export * from './src/ServerRenderedHeadTag';
 export * from './src/StartupTask';
