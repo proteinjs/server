@@ -1,2 +1,0 @@
-{ "branch": "feat/invite-flow-with-apps", "packages": ["api", "server"],
-  "suites": ["packages/server/test/reactAppHeadTags.test.ts"], "removes": [] }
