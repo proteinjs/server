@@ -21,6 +21,7 @@ import { Logger } from '@proteinjs/logger';
 import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
 import { DevClientBuild } from './DevClientBuild';
 import { GracefulShutdown } from './GracefulShutdown';
+import { RequestErrorHandler } from './RequestErrorHandler';
 
 const staticContentPath = '/static/';
 const logger = new Logger({ name: 'Server' });
@@ -73,6 +74,9 @@ export async function startServer(config: ServerConfig) {
 
   loadDefaultStarRoute(routes, app, config);
   afterRequest(app, config);
+  // Last: the one handler for errors raised before a route ran (see RequestErrorHandler) — never
+  // express's stderr printer.
+  app.use(new RequestErrorHandler().middleware());
   await initializeSocketIO(app, server);
 
   await runStartupTasks('after server config');

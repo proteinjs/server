@@ -77,11 +77,19 @@ function wrapRoute(
     const requestNumber = ++requestCounter;
     const requestId = crypto.randomBytes(8).toString('hex');
 
-    // Set metadata into request async-hook storage
+    // The request's own facts, into the async-hook storage every line of the request reads — its
+    // OWN: the entry inherited from a prior request's lineage (a reused keep-alive socket) is
+    // cleared first, the same boundary cure the session bag gets below.
+    const userAgent = request.headers['user-agent'];
+    const clientContext = Request.clientContextOf(request.headers);
+    new Request().clearMetadata();
     new Request().setMetadata({
       number: requestNumber,
       id: requestId,
       url: request.originalUrl,
+      method: request.method,
+      ...(userAgent ? { userAgent } : {}),
+      ...(clientContext ? { clientContext } : {}),
     });
     const sessionData: SessionData = { sessionId: request.sessionID, user: request.user as string, data: {} };
     for (const sessionDataCache of getSessionDataCaches()) {

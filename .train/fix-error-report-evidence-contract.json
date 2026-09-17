@@ -1,0 +1,6 @@
+{
+  "branch": "fix/error-report-evidence-contract",
+  "packages": ["server"],
+  "suites": ["packages/server/test/requestErrorHandler.test.ts", "packages/server/test/requestMetadata.test.ts"],
+  "removes": []
+}
