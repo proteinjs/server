@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.8.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.7.0...@proteinjs/server@3.8.0) (2026-09-17)
+
+
+### Features
+
+* **server-api:** server-rendered head tags — a ServerRenderedHeadTag loadable rendered into the page's <head> ([816b92e](https://github.com/proteinjs/server/commit/816b92ee1595681db1a9e92a364e0997e82081ad))
+
+
+
+
+
 # [3.7.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.6.0...@proteinjs/server@3.7.0) (2026-09-12)
 
 
