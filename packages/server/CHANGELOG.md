@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.8.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.8.0...@proteinjs/server@3.8.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* a credential check never ends the process ([f936cb7](https://github.com/proteinjs/server/commit/f936cb7cde2e7aace1fd287f0c12cf06aa543a0b))
+
+
+
+
+
 # [3.8.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.7.0...@proteinjs/server@3.8.0) (2026-09-17)
 
 
