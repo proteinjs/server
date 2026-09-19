@@ -15,8 +15,13 @@
  * Also serves /server-timeouts: the LIVE http.Server's keepAliveTimeout/headersTimeout (read off
  * the request's own socket), so the keep-alive suite asserts the running instance through the
  * front door instead of re-deriving values from source.
+ *
+ * Also serves the local-strategy suite: /served, a route any request reaches (one carrying the
+ * strategy's `username` + `password` fields included), and /local-strategy, a consumer route
+ * driving the registered strategy the passport way (`passport.authenticate('local')`).
  */
 const expressSession = require('express-session');
+const passport = require('passport');
 const { startServer, GracefulShutdown } = require('../../dist/generated/index.js');
 
 const port = Number(process.env.FIXTURE_PORT);
@@ -27,8 +32,17 @@ if (!port) {
 startServer({
   port,
   session: { secret: 'graceful-shutdown-test', store: new expressSession.MemoryStore() },
+  // The credential check every consumer configures, in the three shapes the local-strategy suite
+  // drives: a right password passes, a wrong one is a failed check (the reason), and the name
+  // `unavailable` is a check that fails outright (a rejection).
+  authenticate: async (username, password) => {
+    if (username === 'unavailable') {
+      throw new Error('credential store unavailable');
+    }
+    return password === 'right' ? true : 'wrong password';
+  },
+  // Request logging stays ON — the served shape; the suites read their own markers off stdout.
   request: {
-    disableRequestLogging: true,
     // The slow endpoint rides the beforeRequest middleware seam so the fixture needs no
     // reflection-registered Route of its own: it answers /slow itself (never calls next)
     // after ?ms= of held work, standing in for any long in-flight request.
@@ -60,6 +74,25 @@ startServer({
           console.log(`HOLD_RELEASED ${label}`);
         }, ms);
         response.status(200).send('held');
+        return;
+      }
+      if (request.path === '/served') {
+        // A route like any other: the framework serves the request whatever fields it carries —
+        // the route decides what credentials mean, if anything.
+        response.status(200).send('served');
+        return;
+      }
+      if (request.path === '/local-strategy') {
+        // A consumer route driving the registered strategy the passport way: passport's own
+        // answers (401 for a failed check, a session for a passed one, next(error) for a failing
+        // one) are the contract.
+        passport.authenticate('local')(request, response, (error) => {
+          if (error) {
+            next(error);
+            return;
+          }
+          response.status(200).send(`logged in as ${request.user.username}`);
+        });
         return;
       }
       if (request.path !== '/slow') {

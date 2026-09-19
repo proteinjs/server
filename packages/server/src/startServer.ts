@@ -338,16 +338,34 @@ function configureSession(app: express.Express, config: ServerConfig) {
   }
 }
 
+/**
+ * Registers the local strategy over the consumer's credential check, for consumer routes to drive
+ * (`passport.authenticate('local')`). The framework never runs it on a request of its own: the
+ * strategy fires on ANY request whose body or query carries its `username` and `password` fields,
+ * whatever the path — a credential check belongs to the route that asked for it.
+ */
 function initializeAuthentication(authenticate: (username: string, password: string) => Promise<true | string>) {
   passport.use(
     new passportLocal.Strategy(async function (username, password, done) {
       logger.info({ message: `Authenticating` });
-      const result = await authenticate(username, password);
-      if (result === true) {
-        return done(null, { username });
+      // Passport does not await this callback, so it settles through `done` on every path — a
+      // rejection here is nobody's to catch and ends the process. A failed check (the reason, as
+      // a string) is a passport FAILURE, answered 401; a check that could not run is a passport
+      // ERROR, handed to the pipeline.
+      let result: true | string;
+      try {
+        result = await authenticate(username, password);
+      } catch (error) {
+        done(error);
+        return;
       }
 
-      return done(new Error(result));
+      if (result === true) {
+        done(null, { username });
+        return;
+      }
+
+      done(null, false, { message: result });
     })
   );
 
@@ -363,23 +381,6 @@ function initializeAuthentication(authenticate: (username: string, password: str
 }
 
 function beforeRequest(app: express.Express, config: ServerConfig) {
-  if (config.request?.disableRequestLogging == false || typeof config.request?.disableRequestLogging === 'undefined') {
-    app.use(async (request: express.Request, response: express.Response, next: express.NextFunction) => {
-      if (config.authenticate) {
-        await new Promise<void>((resolve, reject) => {
-          passport.authenticate('local', function (err: unknown) {
-            if (err) {
-              reject(err);
-            }
-
-            resolve();
-          })(request, response, next);
-        });
-      }
-      next();
-    });
-  }
-
   if (config.request?.beforeRequest) {
     app.use(config.request.beforeRequest);
   }
