@@ -14,7 +14,7 @@ import { ChildProcess, spawn } from 'child_process';
  *             shutdown.drainTimeoutMs (past it, remaining connections are force-closed and
  *             the exit is still 0).
  *             HOLDS (GracefulShutdown.hold): work no connection represents — a chat turn whose
- *             client disconnected (the 2026-09-05 prod kill, plans/FREE_AGENT.md §M.14) — keeps
+ *             client disconnected (the 2026-09-05 prod kill GracefulShutdown.ts describes) — keeps
  *             the process alive past the connection drain until it releases, bounded by
  *             shutdown.turnDrainMs; past THAT bound the holds still outstanding are logged by
  *             label and abandoned, and the exit is still 0.

@@ -5,9 +5,9 @@ import { ServerConfig, getServerRenderedHeadTags, getServerRenderedScripts } fro
 import { Fs } from '@proteinjs/util-node';
 import { DevClientBuild } from '../DevClientBuild';
 
-// Browser-chrome ground colors mirrored from @n3xah/util-ui Theme.tsx getTheme()
-// (lightPalette/darkPalette `background.default`) — proteinjs cannot import n3xah,
-// so the hex values are hard-coded here and must track that file.
+// Browser-chrome ground colors: the light and dark `background.default` of the consumer
+// application's theme. This package cannot import a consumer's theme, so the hex values are
+// hard-coded here and must track it.
 const THEME_COLOR_LIGHT = '#FFFFFF';
 const THEME_COLOR_DARK = '#202020';
 
