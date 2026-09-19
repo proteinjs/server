@@ -1,0 +1,2 @@
+{ "branch": "chore/open-source-wording", "packages": ["server"],
+  "suites": ["packages/server/test/gracefulShutdown.test.ts", "packages/server/test/reactAppBoot.test.ts", "packages/server/test/reactAppHeadTags.test.ts"], "removes": [] }
