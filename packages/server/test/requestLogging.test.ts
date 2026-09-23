@@ -158,6 +158,34 @@ describe('the request log carries the query keys, never their values', () => {
     expect(log).toMatch(/Started \/some-page\?<redacted>$/m);
     expect(log).not.toContain('abcd');
   }, 30000);
+
+  it('the Timed-out line — the request timeout firing on a request still arriving — carries the same form', async () => {
+    // A short request timeout, and a request whose body never finishes arriving (Content-Length
+    // 10, three bytes sent) to the fixture's routed /slow-route: the route runs on the headers, the
+    // socket idles, the timeout fires while the message is still incomplete — the one shape node
+    // hands to the request's timeout callback — and the request log writes its Timed-out line, the
+    // third line that prints the url.
+    fixture = await startFixture({ FIXTURE_REQUEST_TIMEOUT_MS: '200' });
+
+    const socket = net.connect(fixture.port, '127.0.0.1');
+    await new Promise<void>((resolve, reject) => {
+      socket.once('connect', resolve);
+      socket.once('error', reject);
+    });
+    socket.write(
+      `GET /slow-route?token=${token}&ms=1500 HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Forwarded-Proto: https\r\nContent-Length: 10\r\n\r\nabc`
+    );
+    try {
+      await fixture.waitForLine(/Timed out \/slow-route/m);
+    } finally {
+      socket.destroy();
+    }
+
+    const log = fixture.stdout();
+    expect(log).toMatch(/Started \/slow-route\?token=<redacted>&ms=<redacted>$/m);
+    expect(log).toMatch(/Timed out \/slow-route\?token=<redacted>&ms=<redacted>$/m);
+    expect(log).not.toContain('abcd');
+  }, 30000);
 });
 
 /** The request log's own lines: the Started/Finished pair wrapRoute writes. */
@@ -165,7 +193,8 @@ function requestLines(log: string): string[] {
   return log.split('\n').filter((line) => /\b(Started|Finished) \//.test(line));
 }
 
-async function startFixture(): Promise<Fixture> {
+/** @param fixtureEnv the fixture's own switches (FIXTURE_*), on top of the scrubbed environment. */
+async function startFixture(fixtureEnv: Record<string, string> = {}): Promise<Fixture> {
   const port = await ephemeralPort();
   // Scrub the env vars startServer reads (dev machines export some of these): the fixture's
   // behavior must come from its own config only.
@@ -176,7 +205,7 @@ async function startFixture(): Promise<Fixture> {
   delete env.HMR_PORT;
   const child = spawn(process.execPath, [fixturePath], {
     cwd: packageRoot,
-    env: { ...env, FIXTURE_PORT: String(port) },
+    env: { ...env, ...fixtureEnv, FIXTURE_PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';

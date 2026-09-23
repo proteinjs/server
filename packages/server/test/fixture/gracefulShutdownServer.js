@@ -24,12 +24,65 @@
  */
 const expressSession = require('express-session');
 const passport = require('passport');
+const { SourceRepository } = require('@proteinjs/reflection');
 const { startServer, GracefulShutdown, Request } = require('../../dist/generated/index.js');
 
 const port = Number(process.env.FIXTURE_PORT);
 if (!port) {
   throw new Error('FIXTURE_PORT is required');
 }
+
+/**
+ * A ROUTED slow endpoint: `GET /slow-route?ms=` holds for ?ms= inside a Route the server dispatches
+ * through `wrapRoute` — so it gets the request log's Started/Finished pair, the request metadata
+ * and the request timeout (`FIXTURE_REQUEST_TIMEOUT_MS` → ServerConfig.request.timeoutMs), which
+ * the /slow seam below (a beforeRequest middleware, in front of every route) never reaches. Routes
+ * are found by reflection, so the fixture registers this one the way the built dist registers its
+ * own (dist/generated/index.js: a source-graph node typed `@proteinjs/server-api/Route` + the link
+ * to the object, keyed by the qualified name `<package>/<name>`).
+ */
+const slowRouteName = '@proteinjs/server/slowRoute';
+const routeType = {
+  packageName: '@proteinjs/server-api',
+  name: 'Route',
+  filePath: null,
+  qualifiedName: '@proteinjs/server-api/Route',
+  typeParameters: [],
+  directParents: null,
+};
+SourceRepository.merge(
+  JSON.stringify({
+    options: { directed: true, multigraph: false, compound: false },
+    nodes: [
+      {
+        v: slowRouteName,
+        value: {
+          packageName: '@proteinjs/server',
+          name: 'slowRoute',
+          filePath: __filename,
+          qualifiedName: slowRouteName,
+          type: { ...routeType, directParents: [routeType] },
+          isExported: true,
+          isConst: true,
+          sourceType: 0,
+        },
+      },
+      { v: routeType.qualifiedName },
+    ],
+    edges: [{ v: slowRouteName, w: routeType.qualifiedName, value: 'has type' }],
+  }),
+  {
+    [slowRouteName]: {
+      path: '/slow-route',
+      method: 'get',
+      onRequest: async (request, response) => {
+        const ms = Number(request.query.ms ?? 3000);
+        await new Promise((resolve) => setTimeout(resolve, ms));
+        response.status(200).send('slow-route-done');
+      },
+    },
+  }
+);
 
 startServer({
   port,
@@ -45,6 +98,9 @@ startServer({
   },
   // Request logging stays ON — the served shape; the suites read their own markers off stdout.
   request: {
+    // The request timeout, when a suite sets one (unset = the server's own default): the
+    // request-logging suite fires it inside /slow-route to read the Timed-out line.
+    timeoutMs: process.env.FIXTURE_REQUEST_TIMEOUT_MS ? Number(process.env.FIXTURE_REQUEST_TIMEOUT_MS) : undefined,
     // The slow endpoint rides the beforeRequest middleware seam so the fixture needs no
     // reflection-registered Route of its own: it answers /slow itself (never calls next)
     // after ?ms= of held work, standing in for any long in-flight request.
