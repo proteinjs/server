@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.8.3](https://github.com/proteinjs/server/compare/@proteinjs/server@3.8.2...@proteinjs/server@3.8.3) (2026-09-23)
+
+
+### Bug Fixes
+
+* **server:** the request log skips /health-check ([9951c97](https://github.com/proteinjs/server/commit/9951c97b4683788e308edb097bcd577fd35d219a))
+
+
+
+
+
 ## [3.8.2](https://github.com/proteinjs/server/compare/@proteinjs/server@3.8.1...@proteinjs/server@3.8.2) (2026-09-20)
 
 **Note:** Version bump only for package @proteinjs/server
