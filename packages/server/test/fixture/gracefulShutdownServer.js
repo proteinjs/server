@@ -11,6 +11,8 @@
  *                            its request: the response ends at once, the hold releases itself
  *                            ?ms= later — a detached chat turn's shape (no connection, work live)
  *   HOLD_RELEASED <label>  — that hold released
+ *   REQUEST_METADATA_URL <url> — after a routed request, the url its request metadata carries: what
+ *                            a consumer's log writer attaches to every line the request writes
  *
  * Also serves /server-timeouts: the LIVE http.Server's keepAliveTimeout/headersTimeout (read off
  * the request's own socket), so the keep-alive suite asserts the running instance through the
@@ -22,7 +24,7 @@
  */
 const expressSession = require('express-session');
 const passport = require('passport');
-const { startServer, GracefulShutdown } = require('../../dist/generated/index.js');
+const { startServer, GracefulShutdown, Request } = require('../../dist/generated/index.js');
 
 const port = Number(process.env.FIXTURE_PORT);
 if (!port) {
@@ -103,6 +105,16 @@ startServer({
       const ms = Number(request.query.ms ?? 3000);
       await new Promise((resolve) => setTimeout(resolve, ms));
       response.status(200).send('slow-done');
+    },
+    // A log writer's read of the request — the consumer's DefaultLogWriter attaches
+    // `new Request().getMetadata()` to every line a request writes (the deployed writer prints its
+    // url on each structured line); this seam runs inside the routed request's lineage, after it.
+    afterRequest: async (request, response, next) => {
+      const metadata = new Request().getMetadata();
+      if (metadata) {
+        console.log(`REQUEST_METADATA_URL ${metadata.url}`);
+      }
+      next();
     },
   },
   // A bundle pointer so the '*' react-app route serves its HTML — the html-cache-control

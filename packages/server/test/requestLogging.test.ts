@@ -4,14 +4,20 @@ import * as path from 'path';
 import { ChildProcess, spawn } from 'child_process';
 
 /**
- * The request log's exclusions, on a real server process (spawns the built dist — run
- * `npm run build` first). `wrapRoute` writes a `Started <url>` / `Finished <url>` pair for every
- * routed request unless `shouldLogRequest` says otherwise. The readiness route `/health-check` is
- * polled continuously by whatever fronts the process (a load balancer's health checker, a
- * kubelet's readiness and liveness probes — every couple of seconds per instance, forever), and
- * each poll wrote a pair: paid log ingestion carrying no signal. This suite pins the exclusion at
- * its one owner, and pins that it is EXACT — a page whose path merely begins with `/health-check`
- * is an ordinary request and stays logged.
+ * The request log, on a real server process (spawns the built dist — run `npm run build` first).
+ * `wrapRoute` writes a `Started <url>` / `Finished <url>` pair for every routed request unless
+ * `shouldLogRequest` says otherwise.
+ *
+ * Its exclusions: the readiness route `/health-check` is polled continuously by whatever fronts the
+ * process (a load balancer's health checker, a kubelet's readiness and liveness probes — every
+ * couple of seconds per instance, forever), and each poll wrote a pair: paid log ingestion carrying
+ * no signal. This suite pins the exclusion at its one owner, and pins that it is EXACT — a page
+ * whose path merely begins with `/health-check` is an ordinary request and stays logged.
+ *
+ * Its url: the path and the query's KEYS, never a query VALUE. A reset link, an invite link and the
+ * reset page's token check all carry a live credential in their query, and the log printed it
+ * whole. The same form is the url the request's metadata carries — what a consumer's log writer
+ * attaches to every line the request writes.
  *
  * Asserted through the front door: the fixture runs with request logging on (its served shape),
  * the suite drives the routes and reads the process's stdout.
@@ -77,6 +83,87 @@ describe('request logging exclusions', () => {
     expect(log).not.toMatch(/Started \/health-check$/m);
   }, 30000);
 });
+
+describe('the request log carries the query keys, never their values', () => {
+  // A reset token's shape (64 hex) — any character run of it in a line is the value leaking.
+  const token = 'abcd'.repeat(16);
+  const thoughtId = 'thought-4242';
+  let fixture: Fixture | undefined;
+
+  afterEach(async () => {
+    if (fixture && fixture.child.exitCode === null && fixture.child.signalCode === null) {
+      fixture.child.kill('SIGKILL');
+      await fixture.exited.catch(() => undefined);
+    }
+    fixture = undefined;
+  });
+
+  it('a credential in the query: the Started/Finished lines keep the key and print the mark', async () => {
+    fixture = await startFixture();
+
+    const page = await request(fixture.port, `/some-page?token=${token}`, { 'X-Forwarded-Proto': 'https' });
+    expect(page.status).toBe(200);
+    await fixture.waitForLine(/Finished \/some-page/m);
+
+    const lines = requestLines(fixture.stdout());
+    expect(lines).toContainEqual(expect.stringMatching(/Started \/some-page\?token=<redacted>$/));
+    expect(lines).toContainEqual(expect.stringMatching(/Finished \/some-page\?token=<redacted>$/));
+    expect(lines.filter((line) => line.includes('abcd'))).toEqual([]);
+  }, 30000);
+
+  it('the request metadata a log writer attaches to every line carries the same form', async () => {
+    fixture = await startFixture();
+
+    await request(fixture.port, `/some-page?token=${token}`, { 'X-Forwarded-Proto': 'https' });
+    await fixture.waitForLine(/REQUEST_METADATA_URL \/some-page/m);
+
+    const log = fixture.stdout();
+    expect(log).toMatch(/^REQUEST_METADATA_URL \/some-page\?token=<redacted>$/m);
+    expect(log).not.toContain('abcd');
+  }, 30000);
+
+  it('a request with no query logs its path unchanged', async () => {
+    fixture = await startFixture();
+
+    await request(fixture.port, '/some-page', { 'X-Forwarded-Proto': 'https' });
+    await fixture.waitForLine(/REQUEST_METADATA_URL \/some-page/m);
+
+    const log = fixture.stdout();
+    expect(log).toMatch(/Started \/some-page$/m);
+    expect(log).toMatch(/Finished \/some-page$/m);
+    expect(log).toMatch(/^REQUEST_METADATA_URL \/some-page$/m);
+  }, 30000);
+
+  it('two keys: both keys kept in their order, neither value', async () => {
+    fixture = await startFixture();
+
+    await request(fixture.port, `/some-page?id=${thoughtId}&invite=${token}`, { 'X-Forwarded-Proto': 'https' });
+    await fixture.waitForLine(/REQUEST_METADATA_URL \/some-page/m);
+
+    const log = fixture.stdout();
+    expect(log).toMatch(/Started \/some-page\?id=<redacted>&invite=<redacted>$/m);
+    expect(log).toMatch(/Finished \/some-page\?id=<redacted>&invite=<redacted>$/m);
+    expect(log).toMatch(/^REQUEST_METADATA_URL \/some-page\?id=<redacted>&invite=<redacted>$/m);
+    expect(log).not.toContain(thoughtId);
+    expect(log).not.toContain('abcd');
+  }, 30000);
+
+  it('a query piece with no key is all value: the mark replaces it whole', async () => {
+    fixture = await startFixture();
+
+    await request(fixture.port, `/some-page?${token}`, { 'X-Forwarded-Proto': 'https' });
+    await fixture.waitForLine(/REQUEST_METADATA_URL \/some-page/m);
+
+    const log = fixture.stdout();
+    expect(log).toMatch(/Started \/some-page\?<redacted>$/m);
+    expect(log).not.toContain('abcd');
+  }, 30000);
+});
+
+/** The request log's own lines: the Started/Finished pair wrapRoute writes. */
+function requestLines(log: string): string[] {
+  return log.split('\n').filter((line) => /\b(Started|Finished) \//.test(line));
+}
 
 async function startFixture(): Promise<Fixture> {
   const port = await ephemeralPort();

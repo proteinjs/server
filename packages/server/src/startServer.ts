@@ -21,6 +21,7 @@ import { Logger } from '@proteinjs/logger';
 import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
 import { DevClientBuild } from './DevClientBuild';
 import { GracefulShutdown } from './GracefulShutdown';
+import { RedactedUrl } from './RedactedUrl';
 
 const staticContentPath = '/static/';
 const logger = new Logger({ name: 'Server' });
@@ -283,7 +284,7 @@ function configureHttps(app: express.Express) {
       return;
     }
 
-    logger.debug({ message: `Redirecting to https: ${request.headers.host + request.url}` });
+    logger.debug({ message: `Redirecting to https: ${request.headers.host}${RedactedUrl.of(request.url)}` });
     response.redirect('https://' + request.headers.host + request.url);
   });
 }

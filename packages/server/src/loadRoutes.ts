@@ -11,6 +11,7 @@ import {
 import { createReactApp } from './routes/reactApp';
 import { Logger } from '@proteinjs/logger';
 import { Request } from './Request';
+import { RedactedUrl } from './RedactedUrl';
 
 const logger = new Logger({ name: 'Server' });
 let requestCounter: number = 0;
@@ -76,12 +77,15 @@ function wrapRoute(
 
     const requestNumber = ++requestCounter;
     const requestId = crypto.randomBytes(8).toString('hex');
+    // Every line below — and every line a log writer attaches the metadata to — prints this form:
+    // the path and the query's keys, never a query value (a reset or invite link's credential).
+    const loggedUrl = RedactedUrl.of(request.originalUrl);
 
     // Set metadata into request async-hook storage
     new Request().setMetadata({
       number: requestNumber,
       id: requestId,
-      url: request.originalUrl,
+      url: loggedUrl,
     });
     const sessionData: SessionData = { sessionId: request.sessionID, user: request.user as string, data: {} };
     for (const sessionDataCache of getSessionDataCaches()) {
@@ -97,7 +101,7 @@ function wrapRoute(
     Session.setData(sessionData);
 
     if (shouldLogRequest(request, config)) {
-      let message = `Started ${request.originalUrl}`;
+      let message = `Started ${loggedUrl}`;
       if (process.env.DEVELOPMENT) {
         message = `[#${requestNumber}] ${message}`;
       }
@@ -106,7 +110,7 @@ function wrapRoute(
 
     await runBeforeRequestListeners(request, response);
 
-    setRequestTimeout(request, config, requestNumber);
+    setRequestTimeout(request, config, requestNumber, loggedUrl);
 
     // Run route
     try {
@@ -119,7 +123,7 @@ function wrapRoute(
     await runAfterRequestListeners(request, response);
 
     if (shouldLogRequest(request, config)) {
-      let message = `Finished ${request.originalUrl}`;
+      let message = `Finished ${loggedUrl}`;
       if (process.env.DEVELOPMENT) {
         message = `[#${requestNumber}] ${message}`;
       }
@@ -154,11 +158,11 @@ function shouldLogRequest(request: express.Request, config: ServerConfig) {
   return true;
 }
 
-function setRequestTimeout(request: express.Request, config: ServerConfig, requestNumber: number) {
+function setRequestTimeout(request: express.Request, config: ServerConfig, requestNumber: number, loggedUrl: string) {
   const sixtyMinutes = 1000 * 60 * 60;
   const timeout = typeof config.request?.timeoutMs !== 'undefined' ? config.request.timeoutMs : sixtyMinutes;
   request.setTimeout(timeout, () => {
-    let message = `Timed out ${request.originalUrl}`;
+    let message = `Timed out ${loggedUrl}`;
     if (process.env.DEVELOPMENT) {
       message = `[#${requestNumber}] ${message}`;
     }
