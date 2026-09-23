@@ -93,8 +93,10 @@ async function startFixture(): Promise<Fixture> {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = '';
-  // The dev log writer colors its lines; the assertions read the plain text.
-  const stripAnsi = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, '');
+  // The dev log writer colors its lines; the assertions read the plain text. The escape is built,
+  // not written: a control character in a regex literal is what eslint's no-control-regex refuses.
+  const ansiColor = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
+  const stripAnsi = (text: string) => text.replace(ansiColor, '');
   child.stdout!.on('data', (chunk) => (output += stripAnsi(String(chunk))));
   child.stderr!.on('data', (chunk) => (output += stripAnsi(String(chunk))));
   const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) =>
