@@ -1,2 +1,2 @@
 { "branch": "fix/request-log-redacts-query-values", "packages": ["server"],
-  "suites": ["packages/server/test/requestLogging.test.ts"], "removes": [] }
+  "suites": ["packages/server/test/requestLogging.test.ts", "packages/server/test/RedactedUrl.test.ts"], "removes": [] }
