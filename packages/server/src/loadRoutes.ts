@@ -130,12 +130,24 @@ function wrapRoute(
   };
 }
 
+/**
+ * The readiness route (src/routes/healthCheck.ts). Polled continuously by whatever fronts the
+ * process — a load balancer's health checker, a kubelet's readiness and liveness probes, every
+ * couple of seconds per instance, forever — so its Started/Finished pair is paid log ingestion
+ * carrying no signal. Compared exactly: a page whose path merely begins with it is a request.
+ */
+const HEALTH_CHECK_PATH = '/health-check';
+
 function shouldLogRequest(request: express.Request, config: ServerConfig) {
   if (config.request?.disableRequestLogging) {
     return false;
   }
 
   if (request.path.startsWith('/static') || request.path.startsWith('/favicon.ico')) {
+    return false;
+  }
+
+  if (request.path === HEALTH_CHECK_PATH) {
     return false;
   }
 
