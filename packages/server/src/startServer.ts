@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import bodyParser from 'body-parser';
 import passport from 'passport';
 import passportLocal from 'passport-local';
-import { createServer as createHttpServer, Server as HttpServer } from 'http';
+import { createServer as createHttpServer, Server as HttpServer, IncomingMessage } from 'http';
 import {
   Global,
   GlobalData,
@@ -18,7 +18,9 @@ import {
 } from '@proteinjs/server-api';
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { Logger } from '@proteinjs/logger';
+import { RequestDigests } from '@proteinjs/util-node';
 import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
+import { SocketHandshakeRefusals } from './SocketHandshakeRefusals';
 import { DevClientBuild } from './DevClientBuild';
 import { GracefulShutdown } from './GracefulShutdown';
 import { RedactedUrl } from './RedactedUrl';
@@ -74,7 +76,7 @@ export async function startServer(config: ServerConfig) {
 
   loadDefaultStarRoute(routes, app, config);
   afterRequest(app, config);
-  await initializeSocketIO(app, server);
+  await initializeSocketIO(app, server, config);
 
   await runStartupTasks('after server config');
   if (config.onStartup) {
@@ -393,8 +395,13 @@ function afterRequest(app: express.Express, config: ServerConfig) {
   }
 }
 
-async function initializeSocketIO(app: express.Express, server: HttpServer) {
+async function initializeSocketIO(app: express.Express, server: HttpServer, config: ServerConfig) {
   const io = await SocketIOServerRepo.createSocketIOServer(server);
+  // Every refused handshake leaves one WARN line, whoever refused it (the gate below or the transport),
+  // its device hash keyed by the secret the session signs with (the first, when it rotates through a list).
+  const sessionSecret = config.session.secret;
+  const digests = new RequestDigests({ secret: Array.isArray(sessionSecret) ? sessionSecret[0] : sessionSecret });
+  const refusals = new SocketHandshakeRefusals(app, digests);
 
   // Share session and passport middleware with Socket.IO
   const wrapMiddleware = (middleware: any) => (socket: any, next: any) => middleware(socket.request, {}, next);
@@ -408,8 +415,19 @@ async function initializeSocketIO(app: express.Express, server: HttpServer) {
     if (socket.request.user) {
       next();
     } else {
+      refusals.refused({ request: socket.request, reason: 'Unauthorized' });
       next(new Error('Unauthorized'));
     }
+  });
+
+  // The transport's own refusals (a malformed or unknown handshake, a bad upgrade): the same line.
+  io.engine.on('connection_error', (error: { req: IncomingMessage; code?: number; message: string; context?: any }) => {
+    refusals.refused({
+      request: error.req,
+      reason: error.message,
+      code: error.code,
+      context: typeof error.context?.name === 'string' ? error.context.name : undefined,
+    });
   });
 
   // Map this socket to the session id so it can be closed when the session is destroyed
