@@ -19,6 +19,10 @@ import { ChildProcess, spawn } from 'child_process';
  *             shutdown.turnDrainMs; past THAT bound the holds still outstanding are logged by
  *             label and abandoned, and the exit is still 0.
  *   SIGINT  → immediate exit 0 (dev ctrl-C: fast, quiet).
+ *   An uncaught exception, or a rejection nothing handles → the error is printed through the
+ *             logger (so the error's own inspect hook decides what prints — a cause it withholds
+ *             stays withheld), never through Node's fatal printer (which inspects with custom
+ *             inspection off and walks the cause), and the process exits 1 at once — no drain.
  *   exit 86 → RESTART_REQUEST_EXIT_CODE, untouched by this feature: process.exit(86) is not
  *             signal-driven (ServePackageSupervisor's respawn contract rides it).
  */
@@ -107,6 +111,43 @@ describe('graceful shutdown', () => {
     expect(Date.now() - sigintAt).toBeLessThan(2000); // no drain delay on the fast path
   }, 30000);
 
+  describe('fatal errors — an uncaught exception or a rejection nothing handles', () => {
+    // A record's value in the words of the error's cause: the kind of text a backend's refusal
+    // quotes (a unique index's colliding key), which the error's inspect hook withholds.
+    const causeValue = 'record-value-5c1e0d9a';
+
+    it.each([
+      ['Uncaught exception', 'exception'],
+      ['Unhandled rejection', 'rejection'],
+    ])(
+      '%s: the error prints through the logger with its cause withheld — the value never reaches the output — then exit 1 at once',
+      async (logged, kind) => {
+        // A drain delay long enough that a drain would show: the fatal exit must not take it.
+        fixture = await startFixture(
+          { drainDelayMs: 3000, drainTimeoutMs: 10000 },
+          { FIXTURE_CRASH_CAUSE_VALUE: causeValue }
+        );
+
+        const crashedAt = Date.now();
+        await request(fixture.port, `/crash?kind=${kind}`).catch(() => undefined); // the process may die mid-response
+        const exit = await Promise.race([fixture.exited, sleep(5000).then(() => 'still running 5s after the crash')]);
+
+        // Nothing the process wrote carries the cause's value — Node's fatal printer would print it.
+        expect(fixture.stdout()).not.toContain(causeValue);
+        // The crash is REPORTED, not swallowed: the logger's line, and the error printed through
+        // its own hook (its name and message, the cause named as withheld).
+        expect(fixture.stdout()).toContain(`[GracefulShutdown] ${logged} — exiting 1`);
+        expect(fixture.stdout()).toContain('CauseWithheldError: the statement failed (ALREADY_EXISTS)');
+        expect(fixture.stdout()).toContain('<withheld: the backend error can quote record values>');
+        // The process does not keep serving: exit 1 (Node's own code for a fatal error), with no
+        // drain window.
+        expect(exit).toEqual({ code: 1, signal: null });
+        expect(Date.now() - crashedAt).toBeLessThan(2000);
+      },
+      30000
+    );
+  });
+
   describe('holds — work no connection represents (a detached chat turn)', () => {
     it('SIGTERM: a hold whose request already ended keeps the process alive past the connection drain; its release lets the exit proceed', async () => {
       // No delay, a short connection bound, a long hold bound: the ONLY thing that can keep this
@@ -165,11 +206,14 @@ describe('graceful shutdown', () => {
   });
 });
 
-async function startFixture(shutdown: {
-  drainDelayMs: number;
-  drainTimeoutMs: number;
-  turnDrainMs?: number;
-}): Promise<Fixture> {
+async function startFixture(
+  shutdown: {
+    drainDelayMs: number;
+    drainTimeoutMs: number;
+    turnDrainMs?: number;
+  },
+  fixtureEnv: Record<string, string> = {}
+): Promise<Fixture> {
   const port = await ephemeralPort();
   // Scrub the env vars startServer reads (dev machines export some of these): the fixture's
   // behavior must come from its own config only.
@@ -186,6 +230,7 @@ async function startFixture(shutdown: {
       FIXTURE_DRAIN_DELAY_MS: String(shutdown.drainDelayMs),
       FIXTURE_DRAIN_TIMEOUT_MS: String(shutdown.drainTimeoutMs),
       ...(shutdown.turnDrainMs !== undefined ? { FIXTURE_TURN_DRAIN_MS: String(shutdown.turnDrainMs) } : {}),
+      ...fixtureEnv,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

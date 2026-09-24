@@ -30,7 +30,12 @@
  * Also serves the local-strategy suite: /served, a route any request reaches (one carrying the
  * strategy's `username` + `password` fields included), and /local-strategy, a consumer route
  * driving the registered strategy the passport way (`passport.authenticate('local')`).
+ *
+ * Also serves the fatal-error suite: /crash?kind=exception|rejection answers 202, then fails in a
+ * way nothing catches — an exception thrown outside any handler, or a rejected promise nothing
+ * handles — with a CauseWithheldError whose cause's words carry FIXTURE_CRASH_CAUSE_VALUE.
  */
+const { inspect } = require('util');
 const expressSession = require('express-session');
 const passport = require('passport');
 const { SourceRepository } = require('@proteinjs/reflection');
@@ -92,6 +97,23 @@ SourceRepository.merge(
     },
   }
 );
+
+/**
+ * An error that withholds its cause when printed — the shape of a data-layer error whose backend
+ * cause can quote a record's values: the cause rides non-enumerable for callers in process, and the
+ * `util.inspect.custom` hook prints the error's own stack and names the cause as withheld.
+ */
+class CauseWithheldError extends Error {
+  constructor(message, cause) {
+    super(message);
+    this.name = 'CauseWithheldError';
+    Object.defineProperty(this, 'cause', { value: cause, enumerable: false, writable: false });
+  }
+
+  [inspect.custom]() {
+    return `${this.stack} { cause: '<withheld: the backend error can quote record values>' }`;
+  }
+}
 
 /** The request metadata a log writer would attach to a line written here, as a marker's text. */
 function metadataHere() {
@@ -178,6 +200,23 @@ startServer({
           }
           response.status(200).send(`logged in as ${request.user.username}`);
         });
+        return;
+      }
+      if (request.path === '/crash') {
+        // A failure nothing catches: ?kind=exception throws outside any handler (an uncaught
+        // exception), ?kind=rejection rejects a promise nothing handles (an unhandled rejection).
+        const cause = new Error(
+          `backend refused the write: key ${process.env.FIXTURE_CRASH_CAUSE_VALUE} already exists`
+        );
+        const error = new CauseWithheldError('the statement failed (ALREADY_EXISTS)', cause);
+        response.status(202).send('crashing');
+        if (request.query.kind === 'rejection') {
+          Promise.reject(error);
+        } else {
+          setImmediate(() => {
+            throw error;
+          });
+        }
         return;
       }
       if (request.path === '/parked-page') {
