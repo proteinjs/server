@@ -20,9 +20,12 @@ import { ChildProcess, spawn } from 'child_process';
  * attaches to every line the request writes.
  *
  * Its metadata is the request's OWN on a reused keep-alive connection. Every request on a
- * connection is dispatched inside that connection's async lineage, so the connection carries the
+ * connection is dispatched inside that connection's async lineage, so the connection carried the
  * first request's metadata to every later one; the metadata is first-write-wins, so the later
- * requests' own was silently dropped and every line they wrote named the first request.
+ * requests' own was silently dropped and every line they wrote named the first request — and the
+ * lines written before a route (the session store's read) and socket.io's polling requests (which
+ * never reach a route) named it too. A line written before its request's route carries no
+ * request's metadata; never another request's.
  *
  * Asserted through the front door: the fixture runs with request logging on (its served shape),
  * the suite drives the routes and reads the process's stdout.
@@ -229,11 +232,10 @@ describe('each request on a reused keep-alive connection carries its own request
 
   it('a second request dispatched behind the session store’s read (a visitor with a session): its own number and url', async () => {
     fixture = await startFixture();
-    // A session cookie, minted on its own connection: carrying it makes the session middleware
-    // read the store, and the store answers on a later turn — the request is dispatched in a
-    // continuation born inside the connection's lineage, not in the connection's own context.
-    const minted = await request(fixture.port, '/session-cookie', https);
-    const cookie = minted.setCookie.find((value) => value.startsWith('connect.sid='))!.split(';')[0];
+    // Carrying a session cookie makes the session middleware read the store, and the store answers
+    // on a later turn — the request is dispatched in a continuation born inside the connection's
+    // lineage, not in the connection's own context.
+    const cookie = await sessionCookie(fixture.port);
     agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
 
     const first = await request(fixture.port, '/first-page', https, agent);
@@ -249,7 +251,71 @@ describe('each request on a reused keep-alive connection carries its own request
       url: '/second-page',
     });
   }, 30000);
+
+  it('a line written before the route (the session store’s read, behind a cookie) carries no request’s metadata, never the previous one’s', async () => {
+    fixture = await startFixture();
+    const cookie = await sessionCookie(fixture.port);
+    agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+
+    await request(fixture.port, '/first-page', https, agent);
+    const second = await request(fixture.port, '/second-page', { ...https, Cookie: cookie }, agent);
+    expect(second.status).toBe(200);
+    expect(second.reusedSocket).toBe(true);
+    await fixture.waitForLine(/^REQUEST_METADATA \/second-page /m);
+
+    // The store is read once — by the second request, in front of its route, before the request
+    // has a number of its own.
+    expect(markerReads(fixture.stdout(), 'SESSION_READ_METADATA')).toEqual(['none']);
+    expect(metadataRead(fixture.stdout(), '/second-page').url).toBe('/second-page');
+  }, 30000);
+
+  it('a socket.io polling request on the connection carries no request’s metadata, never the previous one’s', async () => {
+    fixture = await startFixture();
+    await fixture.waitForLine(/^FIXTURE_READY$/m);
+    agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+
+    await request(fixture.port, '/first-page', https, agent);
+    // socket.io's engine answers its own path ahead of the app: the polling handshake never
+    // reaches a route.
+    const polling = await request(fixture.port, '/socket.io/?EIO=4&transport=polling', undefined, agent);
+    expect(polling.status).toBe(200);
+    expect(polling.reusedSocket).toBe(true);
+    await fixture.waitForLine(/^SOCKET_IO_CONNECTION_METADATA /m);
+
+    expect(markerReads(fixture.stdout(), 'SOCKET_IO_CONNECTION_METADATA')).toEqual(['none']);
+  }, 30000);
+
+  it('a request dispatched from inside another request’s lineage (a hand-off): each keeps its own', async () => {
+    fixture = await startFixture();
+    // The parked request's dispatch is held in front of the routes; the releasing request runs it
+    // from its own after-request seam, then reads its own metadata.
+    const parked = request(fixture.port, '/parked-page', https);
+    await fixture.waitForLine(/^PARKED \/parked-page$/m);
+    const releasing = await request(fixture.port, '/first-page?release=1', https);
+    const parkedResponse = await parked;
+    expect([releasing.status, parkedResponse.status]).toEqual([200, 200]);
+    await fixture.waitForLine(/^REQUEST_METADATA \/parked-page /m);
+
+    const releasingRead = metadataRead(fixture.stdout(), '/first-page');
+    const parkedRead = metadataRead(fixture.stdout(), '/parked-page');
+    expect([releasingRead.url, parkedRead.url]).toEqual(['/first-page?release=<redacted>', '/parked-page']);
+    expect(parkedRead.number).toBe(releasingRead.number + 1);
+  }, 30000);
 });
+
+/** A session cookie (`connect.sid=…`), minted on its own connection. */
+async function sessionCookie(port: number): Promise<string> {
+  const minted = await request(port, '/session-cookie', { 'X-Forwarded-Proto': 'https' });
+  return minted.setCookie.find((value) => value.startsWith('connect.sid='))!.split(';')[0];
+}
+
+/** Every value the fixture printed after `marker` (its `<marker> <value>` lines), in order. */
+function markerReads(log: string, marker: string): string[] {
+  return log
+    .split('\n')
+    .filter((line) => line.startsWith(`${marker} `))
+    .map((line) => line.slice(marker.length + 1));
+}
 
 /**
  * The request metadata a log writer read inside the request whose own path is `requestPath` (the

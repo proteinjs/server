@@ -1,5 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
+import { AsyncResource } from 'async_hooks';
 import {
   ServerConfig,
   Route,
@@ -69,22 +70,22 @@ function wrapRoute(
   route: (request: express.Request, response: express.Response) => Promise<void>,
   config: ServerConfig
 ) {
-  return async function (request: express.Request, response: express.Response, next: express.NextFunction) {
-    if (response.locals['responseHandled']) {
-      next();
-      return;
-    }
-
+  const handleRequest = async function (
+    request: express.Request,
+    response: express.Response,
+    next: express.NextFunction
+  ) {
     const requestNumber = ++requestCounter;
     const requestId = crypto.randomBytes(8).toString('hex');
     // Every line below — and every line a log writer attaches the metadata to — prints this form:
     // the path and the query's keys, never a query value (a reset or invite link's credential).
     const loggedUrl = RedactedUrl.of(request.originalUrl);
 
-    // Set this request's OWN metadata into request async-hook storage. On a reused keep-alive
-    // connection the dispatch runs inside the connection's lineage, which carries an earlier
-    // request's metadata, and setMetadata is first-write-wins — clear the inherited entry first
-    // (the same boundary as Session.clearData below).
+    // Seed this request's OWN metadata into its scope. The scope inherits whatever lineage the
+    // dispatch arrives in, and setMetadata is first-write-wins: a request dispatched from inside
+    // another request's lineage (a middleware that holds a request and releases it from another
+    // request's work) would keep that request's metadata. Clear the inherited entry first — the
+    // scope's own, never the other request's (the same boundary as Session.clearData below).
     const requestMetadata = new Request();
     requestMetadata.clearMetadata();
     requestMetadata.setMetadata({
@@ -136,6 +137,28 @@ function wrapRoute(
     }
 
     next();
+  };
+
+  return function (request: express.Request, response: express.Response, next: express.NextFunction) {
+    if (response.locals['responseHandled']) {
+      next();
+      return;
+    }
+
+    // Each routed request runs in its OWN async scope, so its metadata and session data land on
+    // the scope, never on the async context the dispatch arrives in. Node dispatches every request
+    // on a connection from that connection's one long-lived async resource: metadata written there
+    // outlived its request, and on a reused keep-alive connection every later request read it as
+    // its own — in the lines written before its route (the session store's read) and in socket.io's
+    // polling requests, which never reach a route. In the scope, a line written before a request's
+    // route carries no request's metadata, and never another request's.
+    const requestScope = new AsyncResource('ROUTED_REQUEST', { requireManualDestroy: true });
+    try {
+      return requestScope.runInAsyncScope(handleRequest, null, request, response, next);
+    } finally {
+      // The scope's own entries go now; everything the request started holds its own copies.
+      requestScope.emitDestroy();
+    }
   };
 }
 
