@@ -167,6 +167,26 @@ describe('the request log carries the query keys, never their values', () => {
     expect(log).not.toContain('abcd');
   }, 30000);
 
+  it('a fragment the client sent: its content never prints, with or without a query', async () => {
+    // A browser keeps the fragment to itself, but the request target is whatever the client wrote,
+    // and node hands a `#…` through in the url. A link's fragment is where a credential can ride.
+    fixture = await startFixture();
+
+    await request(fixture.port, `/some-page#access=${token}`, { 'X-Forwarded-Proto': 'https' });
+    await fixture.waitForLine(/REQUEST_METADATA_URL \/some-page/m);
+    await request(fixture.port, `/other-page?id=${thoughtId}#access=${token}`, { 'X-Forwarded-Proto': 'https' });
+    await fixture.waitForLine(/REQUEST_METADATA_URL \/other-page/m);
+
+    const log = fixture.stdout();
+    expect(log).toMatch(/Started \/some-page#<redacted>$/m);
+    expect(log).toMatch(/Finished \/some-page#<redacted>$/m);
+    expect(log).toMatch(/^REQUEST_METADATA_URL \/some-page#<redacted>$/m);
+    expect(log).toMatch(/Started \/other-page\?id=<redacted>#<redacted>$/m);
+    expect(log).toMatch(/^REQUEST_METADATA_URL \/other-page\?id=<redacted>#<redacted>$/m);
+    expect(log).not.toContain('abcd');
+    expect(log).not.toContain(thoughtId);
+  }, 30000);
+
   it('the Timed-out line — the request timeout firing on a request still arriving — carries the same form', async () => {
     // A short request timeout, and a request whose body never finishes arriving (Content-Length
     // 10, three bytes sent) to the fixture's routed /slow-route: the route runs on the headers, the

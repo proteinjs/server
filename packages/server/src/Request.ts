@@ -5,7 +5,7 @@ export type RequestMetadata = {
   id: string;
   /**
    * The request's url as a log carries it (`RedactedUrl`): the path and the query's keys, never a
-   * query value — log writers attach it to every line the request writes.
+   * query value or a fragment's content — log writers attach it to every line the request writes.
    */
   url: string;
 };

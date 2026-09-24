@@ -5,7 +5,8 @@ import { RedactedUrl } from '../src/RedactedUrl';
  * print it; this suite pins the form on the shapes a real url can take). The rule under test: the
  * path exactly as it came, then `?`, then every query piece as `key=<redacted>` — the key printed
  * verbatim (never decoded, never re-encoded, never merged with a repeat), the value gone whatever
- * it held, however it was encoded, and however many pieces there are.
+ * it held, however it was encoded, and however many pieces there are; then, from the first `#`, the
+ * fragment as `#<redacted>` whatever it held, with or without a query before it.
  */
 describe('RedactedUrl', () => {
   const mark = RedactedUrl.MARK;
@@ -50,6 +51,37 @@ describe('RedactedUrl', () => {
 
   it('an absolute-form target keeps its origin and path', () => {
     expect(RedactedUrl.of('http://host.example/p?token=secret')).toBe(`http://host.example/p?token=${mark}`);
+  });
+
+  it('a fragment with no query: its content never prints, the mark stands in its place', () => {
+    // A link can carry a credential in its fragment (`#access=…`, kept out of the query so no server
+    // or balancer receives it) — and the page's `location.href`, which a client error report names,
+    // still holds it.
+    expect(RedactedUrl.of('/invite#access=frag-only-secret')).toBe(`/invite#${mark}`);
+    expect(RedactedUrl.of('http://host.example/#access=frag-only-secret')).toBe(`http://host.example/#${mark}`);
+    expect(RedactedUrl.of('/p#bare-secret')).toBe(`/p#${mark}`);
+  });
+
+  it('a query and a fragment: every value marked and the fragment marked on its own — the same fragment shape as with no query', () => {
+    expect(RedactedUrl.of('/p?id=7#access=secret')).toBe(`/p?id=${mark}#${mark}`);
+    expect(RedactedUrl.of('/p?id=7&next=x#secret')).toBe(`/p?id=${mark}&next=${mark}#${mark}`);
+    expect(RedactedUrl.of('/p?#secret')).toBe(`/p?#${mark}`);
+  });
+
+  it('the first `#` starts the fragment: a `?`, `=` or `&` after it is fragment, never query', () => {
+    // A fragment can hold a query-looking run; none of it is a key the log may keep.
+    expect(RedactedUrl.of('/p#a=1?token=secret')).toBe(`/p#${mark}`);
+    expect(RedactedUrl.of('/p#?token=secret&other=x')).toBe(`/p#${mark}`);
+    expect(RedactedUrl.of('/p?next=/x#y?z=secret')).toBe(`/p?next=${mark}#${mark}`);
+    // A second `#` is inside the fragment and goes with it.
+    expect(RedactedUrl.of('/p#one#two=secret')).toBe(`/p#${mark}`);
+  });
+
+  it('an empty fragment prints as it came; an ENCODED `#` is path or value, not a fragment', () => {
+    expect(RedactedUrl.of('/p#')).toBe('/p#');
+    expect(RedactedUrl.of('/p?a=1#')).toBe(`/p?a=${mark}#`);
+    expect(RedactedUrl.of('/a%23b/c#secret')).toBe(`/a%23b/c#${mark}`);
+    expect(RedactedUrl.of('/p?a=x%23y')).toBe(`/p?a=${mark}`);
   });
 
   it('a very long query costs linear time and redacts every piece', () => {
