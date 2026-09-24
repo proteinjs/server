@@ -15,6 +15,13 @@
  *                            a consumer's log writer attaches to every line the request writes
  *   REQUEST_METADATA <path> #<number> <url> — the same read with the request's own path and the
  *                            metadata's number beside it
+ *   SESSION_READ_METADATA <#number url | none> — the request metadata where the session store is
+ *                            read: a line written BEFORE the routes (a request carrying a cookie)
+ *   SOCKET_IO_CONNECTION_METADATA <#number url | none> — the request metadata where socket.io's
+ *                            engine opens a connection: a polling request, which never reaches a route
+ *   PARKED <path>          — /parked-page's dispatch is held; the next request whose query carries
+ *                            `release` dispatches it from inside its own after-request seam — a
+ *                            request dispatched from another request's lineage (a hand-off)
  *
  * Also serves /server-timeouts: the LIVE http.Server's keepAliveTimeout/headersTimeout (read off
  * the request's own socket), so the keep-alive suite asserts the running instance through the
@@ -27,7 +34,7 @@
 const expressSession = require('express-session');
 const passport = require('passport');
 const { SourceRepository } = require('@proteinjs/reflection');
-const { startServer, GracefulShutdown, Request } = require('../../dist/generated/index.js');
+const { startServer, GracefulShutdown, Request, SocketIOServerRepo } = require('../../dist/generated/index.js');
 
 const port = Number(process.env.FIXTURE_PORT);
 if (!port) {
@@ -86,9 +93,27 @@ SourceRepository.merge(
   }
 );
 
+/** The request metadata a log writer would attach to a line written here, as a marker's text. */
+function metadataHere() {
+  const metadata = new Request().getMetadata();
+  return metadata ? `#${metadata.number} ${metadata.url}` : 'none';
+}
+
+// The session store, read by the session middleware in front of every route for a request that
+// carries a session cookie: a store that logs writes its lines here, before the request's route.
+const sessionStore = new expressSession.MemoryStore();
+const readSession = sessionStore.get.bind(sessionStore);
+sessionStore.get = (sessionId, callback) => {
+  console.log(`SESSION_READ_METADATA ${metadataHere()}`);
+  readSession(sessionId, callback);
+};
+
+/** /parked-page's held dispatch (its beforeRequest `next`), until a `release` request runs it. */
+let parkedDispatch;
+
 startServer({
   port,
-  session: { secret: 'graceful-shutdown-test', store: new expressSession.MemoryStore() },
+  session: { secret: 'graceful-shutdown-test', store: sessionStore },
   // The credential check every consumer configures, in the three shapes the local-strategy suite
   // drives: a right password passes, a wrong one is a failed check (the reason), and the name
   // `unavailable` is a check that fails outright (a rejection).
@@ -155,6 +180,11 @@ startServer({
         });
         return;
       }
+      if (request.path === '/parked-page') {
+        parkedDispatch = next;
+        console.log('PARKED /parked-page');
+        return;
+      }
       if (request.path !== '/slow') {
         next();
         return;
@@ -168,6 +198,12 @@ startServer({
     // `new Request().getMetadata()` to every line a request writes (the deployed writer prints its
     // url on each structured line); this seam runs inside the routed request's lineage, after it.
     afterRequest: async (request, response, next) => {
+      if (request.query.release !== undefined && parkedDispatch) {
+        // The hand-off: the parked request's dispatch runs from inside THIS request's lineage.
+        const dispatch = parkedDispatch;
+        parkedDispatch = undefined;
+        dispatch();
+      }
       const metadata = new Request().getMetadata();
       if (metadata) {
         console.log(`REQUEST_METADATA_URL ${metadata.url}`);
@@ -187,4 +223,9 @@ startServer({
     drainTimeoutMs: process.env.FIXTURE_DRAIN_TIMEOUT_MS ? Number(process.env.FIXTURE_DRAIN_TIMEOUT_MS) : undefined,
     turnDrainMs: process.env.FIXTURE_TURN_DRAIN_MS ? Number(process.env.FIXTURE_TURN_DRAIN_MS) : undefined,
   },
-}).then(() => console.log('FIXTURE_READY'));
+}).then(() => {
+  SocketIOServerRepo.getSocketIOServer().engine.on('connection', () => {
+    console.log(`SOCKET_IO_CONNECTION_METADATA ${metadataHere()}`);
+  });
+  console.log('FIXTURE_READY');
+});
