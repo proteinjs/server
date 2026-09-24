@@ -104,6 +104,29 @@ describe('a refused socket handshake leaves one WARN line with the device hash',
     expect(plain).not.toMatch(/198\.51\.100\.23|203\.0\.113\.9|34\.120\.1\.1/);
   }, 30000);
 
+  it('a storm of 20 refused handshakes leaves exactly 20 lines — one per refusal, never one for the storm nor one per request', async () => {
+    fixture = await startFixture();
+
+    const answers = await Promise.all(Array.from({ length: 20 }, () => connectWithoutSession(fixture!.port)));
+    expect(answers).toEqual(Array(20).fill('44{"message":"Unauthorized","data":{"code":"NO_SESSION"}}'));
+    await fixture.waitForLine(/(Socket handshake refused[\s\S]*?){20}/);
+    // The lines are written after the refusals are answered: settle before counting, so a 21st
+    // would be counted too.
+    await sleep(500);
+
+    const lines = refusalLines(fixture.output());
+    expect(lines).toHaveLength(20);
+    for (const line of lines) {
+      expect(line.startsWith(WARN_COLOR)).toBe(true);
+      const plain = line.replace(ANSI, '');
+      expect(plain).toContain("code: 'NO_SESSION'");
+      expect(plain).toContain(`device: '${digests.coarseIp('127.0.0.1')}'`);
+      expect(plain).not.toContain('127.0.0.1');
+      expect(plain).not.toMatch(/connect\.sid|sid/i);
+    }
+    expect(fixture.output()).not.toMatch(/Connection error/);
+  }, 30000);
+
   it("the transport's own refusal (an unknown transport) is the same WARN line, with its code — no error-level line", async () => {
     fixture = await startFixture();
 
