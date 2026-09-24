@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.8.5](https://github.com/proteinjs/server/compare/@proteinjs/server@3.8.4...@proteinjs/server@3.8.5) (2026-09-24)
+
+
+### Bug Fixes
+
+* **server:** a refused socket handshake leaves one WARN line with the device's hash ([c54fdef](https://github.com/proteinjs/server/commit/c54fdef371e50c63b8a4f1217a8a750ac73b1938))
+* **server:** each request on a reused keep-alive connection carries its own request metadata ([b72ec38](https://github.com/proteinjs/server/commit/b72ec382f7c99d14fae0a3a3f0563012f53e600c))
+* **server:** each routed request runs in its own async scope, so no line reads another request's metadata ([5786007](https://github.com/proteinjs/server/commit/57860073000166580f4e5428ef78aaaa317455cb))
+
+
+
+
+
 ## [3.8.4](https://github.com/proteinjs/server/compare/@proteinjs/server@3.8.3...@proteinjs/server@3.8.4) (2026-09-24)
 
 
