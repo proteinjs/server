@@ -78,7 +78,8 @@ function wrapRoute(
     const requestNumber = ++requestCounter;
     const requestId = crypto.randomBytes(8).toString('hex');
     // Every line below — and every line a log writer attaches the metadata to — prints this form:
-    // the path and the query's keys, never a query value (a reset or invite link's credential).
+    // the path and the query's keys, never a query value (a reset or invite link's credential) and
+    // never a fragment's content.
     const loggedUrl = RedactedUrl.of(request.originalUrl);
 
     // Set metadata into request async-hook storage
