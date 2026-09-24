@@ -22,6 +22,19 @@
  *   PARKED <path>          — /parked-page's dispatch is held; the next request whose query carries
  *                            `release` dispatches it from inside its own after-request seam — a
  *                            request dispatched from another request's lineage (a hand-off)
+ *   LOG_LINE_CONTEXT <line> | request=<#number url | none> | user=<set | none> | session=<present | none>
+ *                          — with FIXTURE_LOG_LINE_CONTEXT=1: beside EVERY line the process logs,
+ *                            what a consumer's structured log writer stamps on it — the request
+ *                            metadata and the session data read where the line is written (the
+ *                            writer below, registered by reflection). Off by default: the other
+ *                            suites count the process's lines as served.
+ *   BEFORE_ROUTE_CONTEXT <path> request=<…> user=<…> session=<…>
+ *                          — the same read from the consumer's beforeRequest seam: a line written
+ *                            in front of the routes, before the request has metadata of its own
+ *   REQUEST_ID <path> <fresh | repeat> — after a routed request, whether its metadata's id is one no
+ *                            earlier request's read carried (repeat = another request's id)
+ *   SESSION_OWN <path> <yes | no | none> — after a routed request, whether the session data a log
+ *                            writer reads is that request's own session (express's sessionID)
  *
  * Also serves /server-timeouts: the LIVE http.Server's keepAliveTimeout/headersTimeout (read off
  * the request's own socket), so the keep-alive suite asserts the running instance through the
@@ -34,6 +47,8 @@
 const expressSession = require('express-session');
 const passport = require('passport');
 const { SourceRepository } = require('@proteinjs/reflection');
+const { Session } = require('@proteinjs/server-api');
+const { Logger, DevLogWriter } = require('@proteinjs/logger');
 const { startServer, GracefulShutdown, Request, SocketIOServerRepo } = require('../../dist/generated/index.js');
 
 const port = Number(process.env.FIXTURE_PORT);
@@ -42,56 +57,103 @@ if (!port) {
 }
 
 /**
+ * A source-graph registration the way the built dist registers its own (dist/generated/index.js: a
+ * node typed `typeQualifiedName` + the link to the object, keyed by the qualified name
+ * `<package>/<name>`): routes and the default log writer are found by reflection.
+ */
+function register(typeQualifiedName, name, object) {
+  const slash = typeQualifiedName.lastIndexOf('/');
+  const type = {
+    packageName: typeQualifiedName.slice(0, slash),
+    name: typeQualifiedName.slice(slash + 1),
+    filePath: null,
+    qualifiedName: typeQualifiedName,
+    typeParameters: [],
+    directParents: null,
+  };
+  const qualifiedName = `@proteinjs/server/${name}`;
+  SourceRepository.merge(
+    JSON.stringify({
+      options: { directed: true, multigraph: false, compound: false },
+      nodes: [
+        {
+          v: qualifiedName,
+          value: {
+            packageName: '@proteinjs/server',
+            name,
+            filePath: __filename,
+            qualifiedName,
+            type: { ...type, directParents: [type] },
+            isExported: true,
+            isConst: true,
+            sourceType: 0,
+          },
+        },
+        { v: type.qualifiedName },
+      ],
+      edges: [{ v: qualifiedName, w: type.qualifiedName, value: 'has type' }],
+    }),
+    { [qualifiedName]: object }
+  );
+}
+
+/**
  * A ROUTED slow endpoint: `GET /slow-route?ms=` holds for ?ms= inside a Route the server dispatches
  * through `wrapRoute` — so it gets the request log's Started/Finished pair, the request metadata
  * and the request timeout (`FIXTURE_REQUEST_TIMEOUT_MS` → ServerConfig.request.timeoutMs), which
- * the /slow seam below (a beforeRequest middleware, in front of every route) never reaches. Routes
- * are found by reflection, so the fixture registers this one the way the built dist registers its
- * own (dist/generated/index.js: a source-graph node typed `@proteinjs/server-api/Route` + the link
- * to the object, keyed by the qualified name `<package>/<name>`).
+ * the /slow seam below (a beforeRequest middleware, in front of every route) never reaches.
  */
-const slowRouteName = '@proteinjs/server/slowRoute';
-const routeType = {
-  packageName: '@proteinjs/server-api',
-  name: 'Route',
-  filePath: null,
-  qualifiedName: '@proteinjs/server-api/Route',
-  typeParameters: [],
-  directParents: null,
-};
-SourceRepository.merge(
-  JSON.stringify({
-    options: { directed: true, multigraph: false, compound: false },
-    nodes: [
-      {
-        v: slowRouteName,
-        value: {
-          packageName: '@proteinjs/server',
-          name: 'slowRoute',
-          filePath: __filename,
-          qualifiedName: slowRouteName,
-          type: { ...routeType, directParents: [routeType] },
-          isExported: true,
-          isConst: true,
-          sourceType: 0,
-        },
-      },
-      { v: routeType.qualifiedName },
-    ],
-    edges: [{ v: slowRouteName, w: routeType.qualifiedName, value: 'has type' }],
-  }),
-  {
-    [slowRouteName]: {
-      path: '/slow-route',
-      method: 'get',
-      onRequest: async (request, response) => {
-        const ms = Number(request.query.ms ?? 3000);
-        await new Promise((resolve) => setTimeout(resolve, ms));
-        response.status(200).send('slow-route-done');
-      },
-    },
-  }
-);
+register('@proteinjs/server-api/Route', 'slowRoute', {
+  path: '/slow-route',
+  method: 'get',
+  onRequest: async (request, response) => {
+    const ms = Number(request.query.ms ?? 3000);
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    response.status(200).send('slow-route-done');
+  },
+});
+
+/**
+ * A ROUTED session-less POST: `POST /worker-post` — the shape of a worker request a task queue
+ * sends to the process (no cookie, no user), which logs a line of its own from a later turn of its
+ * work. Served over plain http (useHttp), as such a request reaches the process.
+ */
+const workerLogger = new Logger({ name: 'Worker' });
+register('@proteinjs/server-api/Route', 'workerPostRoute', {
+  path: '/worker-post',
+  method: 'post',
+  useHttp: true,
+  onRequest: async (request, response) => {
+    await new Promise((resolve) => setImmediate(resolve));
+    workerLogger.info({ message: 'Working /worker-post' });
+    response.status(200).send('worker-done');
+  },
+});
+
+/**
+ * The consumer's structured log writer, at its seam: the request metadata (`new Request().getMetadata()`)
+ * and the session data (`Session.getData()`) read where each line is written, stamped beside the
+ * line — the deployed writer prints them as the line's request and user blocks. The line itself
+ * still goes through the dev writer unchanged, and the marker prints only under
+ * FIXTURE_LOG_LINE_CONTEXT=1, so every suite's own reads and counts of the log hold.
+ */
+const logLineContext = process.env.FIXTURE_LOG_LINE_CONTEXT === '1';
+register('@proteinjs/logger/DefaultLogWriter', 'contextLogWriter', {
+  write(log) {
+    new DevLogWriter().write(log);
+    if (!logLineContext || !log.message) {
+      return;
+    }
+    const prefix = log.loggerName ? `[${log.loggerName}] ` : '';
+    console.log(`LOG_LINE_CONTEXT ${prefix}${log.message} | ${contextHere()}`);
+  },
+});
+
+/** What a consumer's structured log writer stamps on a line written here: request, user, session. */
+function contextHere() {
+  const session = Session.getData();
+  return `request=${metadataHere()} | user=${session?.user ? 'set' : 'none'} | session=${session?.sessionId ? 'present' : 'none'}`;
+}
 
 /** The request metadata a log writer would attach to a line written here, as a marker's text. */
 function metadataHere() {
@@ -110,6 +172,9 @@ sessionStore.get = (sessionId, callback) => {
 
 /** /parked-page's held dispatch (its beforeRequest `next`), until a `release` request runs it. */
 let parkedDispatch;
+
+/** Every request metadata id an after-request read has carried (REQUEST_ID's fresh/repeat). */
+const requestIdsRead = new Set();
 
 startServer({
   port,
@@ -132,6 +197,9 @@ startServer({
     // reflection-registered Route of its own: it answers /slow itself (never calls next)
     // after ?ms= of held work, standing in for any long in-flight request.
     beforeRequest: async (request, response, next) => {
+      // A line written in front of the routes: the request has no metadata of its own yet, so what
+      // a log writer reads here is whatever the dispatch's async context carries.
+      console.log(`BEFORE_ROUTE_CONTEXT ${request.path} ${contextHere()}`);
       if (request.path === '/server-timeouts') {
         // The socket's `server` IS the live http.Server instance — the values the kernel-visible
         // connection actually runs under, not a copy of the config.
@@ -210,7 +278,15 @@ startServer({
         // The request's own path beside the metadata's number and url: which request each read
         // belongs to, so a read that carries another request's metadata shows as a mismatch.
         console.log(`REQUEST_METADATA ${request.path} #${metadata.number} ${metadata.url}`);
+        // The id: fresh when no earlier request's read carried it (a repeat is another request's).
+        console.log(`REQUEST_ID ${request.path} ${requestIdsRead.has(metadata.id) ? 'repeat' : 'fresh'}`);
+        requestIdsRead.add(metadata.id);
       }
+      // The session data a log writer reads: this request's own (express's sessionID) or not.
+      const session = Session.getData();
+      console.log(
+        `SESSION_OWN ${request.path} ${session?.sessionId ? (session.sessionId === request.sessionID ? 'yes' : 'no') : 'none'}`
+      );
       next();
     },
   },
