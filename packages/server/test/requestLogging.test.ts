@@ -19,6 +19,11 @@ import { ChildProcess, spawn } from 'child_process';
  * whole. The same form is the url the request's metadata carries — what a consumer's log writer
  * attaches to every line the request writes.
  *
+ * Its metadata is the request's OWN on a reused keep-alive connection. Every request on a
+ * connection is dispatched inside that connection's async lineage, so the connection carries the
+ * first request's metadata to every later one; the metadata is first-write-wins, so the later
+ * requests' own was silently dropped and every line they wrote named the first request.
+ *
  * Asserted through the front door: the fixture runs with request logging on (its served shape),
  * the suite drives the routes and reads the process's stdout.
  */
@@ -188,6 +193,77 @@ describe('the request log carries the query keys, never their values', () => {
   }, 30000);
 });
 
+describe('each request on a reused keep-alive connection carries its own request metadata', () => {
+  const https = { 'X-Forwarded-Proto': 'https' };
+  let fixture: Fixture | undefined;
+  let agent: http.Agent | undefined;
+
+  afterEach(async () => {
+    agent?.destroy();
+    agent = undefined;
+    if (fixture && fixture.child.exitCode === null && fixture.child.signalCode === null) {
+      fixture.child.kill('SIGKILL');
+      await fixture.exited.catch(() => undefined);
+    }
+    fixture = undefined;
+  });
+
+  it('a second request dispatched in the connection’s own context: its own number and url', async () => {
+    fixture = await startFixture();
+    // One socket, kept alive: the second request rides the first one's connection.
+    agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+
+    const first = await request(fixture.port, '/first-page', https, agent);
+    const second = await request(fixture.port, '/second-page', https, agent);
+    expect([first.status, second.status]).toEqual([200, 200]);
+    expect(second.reusedSocket).toBe(true);
+    await fixture.waitForLine(/^REQUEST_METADATA \/second-page /m);
+
+    const firstRead = metadataRead(fixture.stdout(), '/first-page');
+    expect(firstRead.url).toBe('/first-page');
+    expect(metadataRead(fixture.stdout(), '/second-page')).toEqual({
+      number: firstRead.number + 1,
+      url: '/second-page',
+    });
+  }, 30000);
+
+  it('a second request dispatched behind the session store’s read (a visitor with a session): its own number and url', async () => {
+    fixture = await startFixture();
+    // A session cookie, minted on its own connection: carrying it makes the session middleware
+    // read the store, and the store answers on a later turn — the request is dispatched in a
+    // continuation born inside the connection's lineage, not in the connection's own context.
+    const minted = await request(fixture.port, '/session-cookie', https);
+    const cookie = minted.setCookie.find((value) => value.startsWith('connect.sid='))!.split(';')[0];
+    agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+
+    const first = await request(fixture.port, '/first-page', https, agent);
+    const second = await request(fixture.port, '/second-page', { ...https, Cookie: cookie }, agent);
+    expect([first.status, second.status]).toEqual([200, 200]);
+    expect(second.reusedSocket).toBe(true);
+    await fixture.waitForLine(/^REQUEST_METADATA \/second-page /m);
+
+    const firstRead = metadataRead(fixture.stdout(), '/first-page');
+    expect(firstRead.url).toBe('/first-page');
+    expect(metadataRead(fixture.stdout(), '/second-page')).toEqual({
+      number: firstRead.number + 1,
+      url: '/second-page',
+    });
+  }, 30000);
+});
+
+/**
+ * The request metadata a log writer read inside the request whose own path is `requestPath` (the
+ * fixture's REQUEST_METADATA line): the number and url every line that request writes carries.
+ */
+function metadataRead(log: string, requestPath: string): { number: number; url: string } {
+  const reads = log
+    .split('\n')
+    .map((line) => /^REQUEST_METADATA (\S+) #(\d+) (\S+)$/.exec(line))
+    .filter((match): match is RegExpExecArray => match !== null && match[1] === requestPath);
+  expect(reads).toHaveLength(1);
+  return { number: Number(reads[0][2]), url: reads[0][3] };
+}
+
 /** The request log's own lines: the Started/Finished pair wrapRoute writes. */
 function requestLines(log: string): string[] {
   return log.split('\n').filter((line) => /\b(Started|Finished) \//.test(line));
@@ -244,17 +320,28 @@ async function startFixture(fixtureEnv: Record<string, string> = {}): Promise<Fi
   }
 }
 
-/** One request on its OWN connection (agent: false — no keep-alive pooling). */
+/**
+ * One request — on its OWN connection by default (agent: false, no keep-alive pooling), or on the
+ * given agent's (a keep-alive agent reuses its connection across calls).
+ */
 function request(
   port: number,
   requestPath: string,
-  headers?: Record<string, string>
-): Promise<{ status: number; body: string }> {
+  headers?: Record<string, string>,
+  agent: http.Agent | false = false
+): Promise<{ status: number; body: string; setCookie: string[]; reusedSocket: boolean }> {
   return new Promise((resolve, reject) => {
-    const req = http.get({ host: '127.0.0.1', port, path: requestPath, agent: false, headers }, (res) => {
+    const req = http.get({ host: '127.0.0.1', port, path: requestPath, agent, headers }, (res) => {
       let body = '';
       res.on('data', (chunk) => (body += String(chunk)));
-      res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
+      res.on('end', () =>
+        resolve({
+          status: res.statusCode ?? 0,
+          body,
+          setCookie: res.headers['set-cookie'] ?? [],
+          reusedSocket: req.reusedSocket,
+        })
+      );
       res.on('error', reject);
     });
     req.on('error', reject);

@@ -81,8 +81,13 @@ function wrapRoute(
     // the path and the query's keys, never a query value (a reset or invite link's credential).
     const loggedUrl = RedactedUrl.of(request.originalUrl);
 
-    // Set metadata into request async-hook storage
-    new Request().setMetadata({
+    // Set this request's OWN metadata into request async-hook storage. On a reused keep-alive
+    // connection the dispatch runs inside the connection's lineage, which carries an earlier
+    // request's metadata, and setMetadata is first-write-wins — clear the inherited entry first
+    // (the same boundary as Session.clearData below).
+    const requestMetadata = new Request();
+    requestMetadata.clearMetadata();
+    requestMetadata.setMetadata({
       number: requestNumber,
       id: requestId,
       url: loggedUrl,
