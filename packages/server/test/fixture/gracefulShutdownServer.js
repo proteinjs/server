@@ -13,6 +13,8 @@
  *   HOLD_RELEASED <label>  — that hold released
  *   REQUEST_METADATA_URL <url> — after a routed request, the url its request metadata carries: what
  *                            a consumer's log writer attaches to every line the request writes
+ *   REQUEST_METADATA <path> #<number> <url> — the same read with the request's own path and the
+ *                            metadata's number beside it
  *
  * Also serves /server-timeouts: the LIVE http.Server's keepAliveTimeout/headersTimeout (read off
  * the request's own socket), so the keep-alive suite asserts the running instance through the
@@ -169,6 +171,9 @@ startServer({
       const metadata = new Request().getMetadata();
       if (metadata) {
         console.log(`REQUEST_METADATA_URL ${metadata.url}`);
+        // The request's own path beside the metadata's number and url: which request each read
+        // belongs to, so a read that carries another request's metadata shows as a mismatch.
+        console.log(`REQUEST_METADATA ${request.path} #${metadata.number} ${metadata.url}`);
       }
       next();
     },
