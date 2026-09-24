@@ -146,6 +146,31 @@ describe('graceful shutdown', () => {
       },
       30000
     );
+
+    it("the rejection POLICY stays Node's: under --unhandled-rejections=warn the listener is not reached, the process keeps serving, and the warning carries no cause", async () => {
+      // One listener replaces the PRINTER only. Node hands a rejection to the uncaughtException
+      // listener exactly when its mode makes the rejection fatal; under `warn` it prints the
+      // error's own stack (no cause walk) as a warning and goes on. A second, unhandledRejection
+      // listener would make every rejection fatal whatever mode the operator set — this pins
+      // that the server adds none.
+      fixture = await startFixture(
+        { drainDelayMs: 0, drainTimeoutMs: 10000 },
+        { FIXTURE_CRASH_CAUSE_VALUE: causeValue, NODE_OPTIONS: '--unhandled-rejections=warn' }
+      );
+
+      await request(fixture.port, '/crash?kind=rejection');
+      await fixture.waitForMarker('UnhandledPromiseRejectionWarning');
+
+      // Still serving: the rejection was not fatal, nothing exited, readiness holds.
+      const health = await request(fixture.port, '/health-check');
+      expect(health.status).toBe(200);
+      expect(fixture.child.exitCode).toBeNull();
+      // The warning names the error through its own stack; the cause's value is nowhere, and the
+      // fatal-error line was never written.
+      expect(fixture.stdout()).toContain('CauseWithheldError: the statement failed (ALREADY_EXISTS)');
+      expect(fixture.stdout()).not.toContain(causeValue);
+      expect(fixture.stdout()).not.toContain('— exiting 1');
+    }, 30000);
   });
 
   describe('holds — work no connection represents (a detached chat turn)', () => {
