@@ -40,7 +40,7 @@ export class ClientAddress {
 
   private forwardedFor(request: ClientRequest): string[] {
     const header = request.headers?.['x-forwarded-for'];
-    const value = Array.isArray(header) ? header.join(',') : (header ?? '');
+    const value = Array.isArray(header) ? header.join(',') : header ?? '';
     return value
       .split(',')
       .map((entry) => entry.trim())
