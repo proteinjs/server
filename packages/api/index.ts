@@ -1,5 +1,6 @@
 export * from './src/ServerConfig';
 export * from './src/Route';
+export * from './src/RawBody';
 export * from './src/RequestListener';
 export { Global, GlobalData, GlobalDataStorage } from './src/global/Global';
 export * from './src/global/GlobalDataCache';
