@@ -27,6 +27,16 @@ import { ChildProcess, spawn } from 'child_process';
  * never reach a route) named it too. A line written before its request's route carries no
  * request's metadata; never another request's.
  *
+ * The shape read off a deployment's log (2026-09-24): a session-less POST from a task queue (no
+ * cookie, no user) whose Started and Finished lines carried a HEALTH CHECK's request number, id and
+ * url. A cookieless request is dispatched in the connection's own async context (no cookie, no store
+ * read, no continuation), so the health check's metadata landed on the connection's resource and the
+ * POST on the same keep-alive socket inherited it. The fixture's log writer stamps what a consumer's
+ * structured writer stamps — the request metadata and the session data read where each line is
+ * written — so the suite asserts on the log lines themselves: the POST's own number, id and url on
+ * every line it writes, no user; a line written in front of its route carries no request's context;
+ * and the same when the POST arrives while the previous request's route still awaits (pipelined).
+ *
  * Asserted through the front door: the fixture runs with request logging on (its served shape),
  * the suite drives the routes and reads the process's stdout.
  */
@@ -322,6 +332,164 @@ describe('each request on a reused keep-alive connection carries its own request
     expect(parkedRead.number).toBe(releasingRead.number + 1);
   }, 30000);
 });
+
+describe('a session-less POST after a health check on one keep-alive connection: every line it writes is its own', () => {
+  let fixture: Fixture | undefined;
+  let agent: http.Agent | undefined;
+
+  afterEach(async () => {
+    agent?.destroy();
+    agent = undefined;
+    if (fixture && fixture.child.exitCode === null && fixture.child.signalCode === null) {
+      fixture.child.kill('SIGKILL');
+      await fixture.exited.catch(() => undefined);
+    }
+    fixture = undefined;
+  });
+
+  it('sequential: the POST’s Started, route and Finished lines carry its own number, id and url, and no user', async () => {
+    fixture = await startFixture({ FIXTURE_LOG_LINE_CONTEXT: '1' });
+    // One socket, kept alive: the health check (as a load balancer's checker or a kubelet probe
+    // sends it — plain http, no cookie) and then the worker POST (no cookie, no user) ride it.
+    agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+
+    const probe = await send(fixture.port, { method: 'GET', path: '/health-check', agent });
+    const worker = await send(fixture.port, { method: 'POST', path: '/worker-post', json: {}, agent });
+    expect([probe.status, worker.status]).toEqual([200, 200]);
+    expect(worker.reusedSocket).toBe(true);
+    await fixture.waitForLine(/^SESSION_OWN \/worker-post /m);
+
+    const log = fixture.stdout();
+    const probeRead = lastMetadataRead(log, '/health-check');
+    const workerRead = lastMetadataRead(log, '/worker-post');
+    expect(workerRead).toEqual({ number: probeRead.number + 1, url: '/worker-post' });
+    expect(markerReads(log, 'REQUEST_ID').filter((read) => read.startsWith('/worker-post '))).toEqual([
+      '/worker-post fresh',
+    ]);
+    // Every line the POST writes — the request log's pair and the route's own line — stamped with
+    // the POST's own request block, and no user.
+    expect(lineContexts(log, '[Server] Started /worker-post')).toEqual([
+      `request=#${workerRead.number} /worker-post | user=none | session=present`,
+    ]);
+    expect(lineContexts(log, '[Worker] Working /worker-post')).toEqual([
+      `request=#${workerRead.number} /worker-post | user=none | session=present`,
+    ]);
+    expect(lineContexts(log, '[Server] Finished /worker-post')).toEqual([
+      `request=#${workerRead.number} /worker-post | user=none | session=present`,
+    ]);
+    // A line written in front of the POST's route carries no request's context — never the health
+    // check's.
+    expect(markerReads(log, 'BEFORE_ROUTE_CONTEXT /worker-post')).toEqual(['request=none | user=none | session=none']);
+    // The session data on the POST's lines is the POST's own (express mints a session id for every
+    // cookieless request), not another request's.
+    expect(markerReads(log, 'SESSION_OWN /worker-post')).toEqual(['yes']);
+  }, 30000);
+
+  it('pipelined: the POST arrives while the previous request’s route still awaits, and each keeps its own', async () => {
+    fixture = await startFixture({ FIXTURE_LOG_LINE_CONTEXT: '1' });
+
+    // Two requests written back to back on one raw socket: the slow route holds its response,
+    // and the worker POST is dispatched behind it, on the same connection, while it waits.
+    const socket = net.connect(fixture.port, '127.0.0.1');
+    await new Promise<void>((resolve, reject) => {
+      socket.once('connect', resolve);
+      socket.once('error', reject);
+    });
+    socket.write(
+      'GET /slow-route?ms=600 HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Forwarded-Proto: https\r\n\r\n' +
+        'POST /worker-post HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}'
+    );
+    try {
+      await fixture.waitForLine(/^SESSION_OWN \/worker-post /m);
+      await fixture.waitForLine(/^SESSION_OWN \/slow-route /m);
+    } finally {
+      socket.destroy();
+    }
+
+    const log = fixture.stdout();
+    // The overlap itself: the POST started before the slow route finished.
+    expect(log.indexOf('Started /worker-post')).toBeGreaterThan(-1);
+    expect(log.indexOf('Started /worker-post')).toBeLessThan(log.indexOf('Finished /slow-route'));
+
+    const slowRead = lastMetadataRead(log, '/slow-route');
+    const workerRead = lastMetadataRead(log, '/worker-post');
+    expect(slowRead.url).toBe('/slow-route?ms=<redacted>');
+    expect(workerRead).toEqual({ number: slowRead.number + 1, url: '/worker-post' });
+    expect(markerReads(log, 'REQUEST_ID').filter((read) => read.startsWith('/worker-post '))).toEqual([
+      '/worker-post fresh',
+    ]);
+    for (const line of [
+      '[Server] Started /worker-post',
+      '[Worker] Working /worker-post',
+      '[Server] Finished /worker-post',
+    ]) {
+      expect(lineContexts(log, line)).toEqual([
+        `request=#${workerRead.number} /worker-post | user=none | session=present`,
+      ]);
+    }
+    // The slow route's Finished line — written after the POST came and went — is still its own.
+    expect(lineContexts(log, '[Server] Finished /slow-route?ms=<redacted>')).toEqual([
+      `request=#${slowRead.number} /slow-route?ms=<redacted> | user=none | session=present`,
+    ]);
+    expect(markerReads(log, 'BEFORE_ROUTE_CONTEXT /worker-post')).toEqual(['request=none | user=none | session=none']);
+    expect(markerReads(log, 'SESSION_OWN /worker-post')).toEqual(['yes']);
+  }, 30000);
+});
+
+/**
+ * What the fixture's log writer stamped beside each log line whose text is exactly `line`
+ * (its LOG_LINE_CONTEXT marker): `request=… | user=… | session=…`, one entry per write.
+ */
+function lineContexts(log: string, line: string): string[] {
+  return markerReads(log, `LOG_LINE_CONTEXT ${line} |`);
+}
+
+/** The LAST request-metadata read inside a request whose own path is `requestPath` (the health check is also polled at boot). */
+function lastMetadataRead(log: string, requestPath: string): { number: number; url: string } {
+  const reads = log
+    .split('\n')
+    .map((line) => /^REQUEST_METADATA (\S+) #(\d+) (\S+)$/.exec(line))
+    .filter((match): match is RegExpExecArray => match !== null && match[1] === requestPath);
+  expect(reads.length).toBeGreaterThan(0);
+  const last = reads[reads.length - 1];
+  return { number: Number(last[2]), url: last[3] };
+}
+
+type SendOptions = {
+  method: string;
+  path: string;
+  headers?: Record<string, string>;
+  json?: unknown;
+  agent?: http.Agent;
+};
+
+/** One request of any method, with an optional JSON body, on its own connection or the given agent's. */
+function send(
+  port: number,
+  { method, path: requestPath, headers, json, agent }: SendOptions
+): Promise<{ status: number; body: string; reusedSocket: boolean }> {
+  const body = json === undefined ? undefined : JSON.stringify(json);
+  const requestHeaders: Record<string, string> = { ...headers };
+  if (body !== undefined) {
+    requestHeaders['Content-Type'] = 'application/json';
+    requestHeaders['Content-Length'] = String(Buffer.byteLength(body));
+  }
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      { host: '127.0.0.1', port, method, path: requestPath, agent: agent ?? false, headers: requestHeaders },
+      (res) => {
+        let responseBody = '';
+        res.on('data', (chunk) => (responseBody += String(chunk)));
+        res.on('end', () =>
+          resolve({ status: res.statusCode ?? 0, body: responseBody, reusedSocket: req.reusedSocket })
+        );
+        res.on('error', reject);
+      }
+    );
+    req.on('error', reject);
+    req.end(body);
+  });
+}
 
 /** A session cookie (`connect.sid=…`), minted on its own connection. */
 async function sessionCookie(port: number): Promise<string> {
