@@ -1,0 +1,8 @@
+{
+  "branch": "feat/socket-refusal-code",
+  "packages": ["api", "server"],
+  "suites": [
+    "packages/server/test/socketHandshakeRefusal.test.ts"
+  ],
+  "removes": []
+}
