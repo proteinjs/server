@@ -1,3 +1,0 @@
-{ "branch": "chore/floors-r10p2-fold1-util-node", "packages": ["server"],
-  "suites": ["packages/server/test/requestLogging.test.ts", "packages/server/test/sessionCookie.test.ts", "packages/server/test/sessionDataRequestBoundary.test.ts"],
-  "removes": [] }
