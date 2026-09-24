@@ -96,6 +96,22 @@ describe('RedactedUrl', () => {
     expect(RedactedUrl.of('')).toBe('');
   });
 
+  it('a token-shaped fragment — an OAuth implicit response, a bare hex token, padded base64 — is the one mark', () => {
+    // The fragment is where a client-side credential rides BY DESIGN (an OAuth implicit-flow
+    // response lands its access token there so no server receives it; an invite link's bare
+    // token likewise): whatever shape the token takes, and however many `&`-joined pieces ride
+    // beside it, the mark is all that prints — with or without a query in front.
+    const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c0ffee';
+    expect(RedactedUrl.of(`/callback#access_token=${jwt}&token_type=bearer&expires_in=3600&state=s1`)).toBe(
+      `/callback#${mark}`
+    );
+    expect(RedactedUrl.of('/invite#deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')).toBe(
+      `/invite#${mark}`
+    );
+    expect(RedactedUrl.of('/p#dG9rZW4vc2VjcmV0==')).toBe(`/p#${mark}`);
+    expect(RedactedUrl.of(`/p?id=7#access_token=${jwt}`)).toBe(`/p?id=${mark}#${mark}`);
+  });
+
   it('a very long query costs linear time and redacts every piece', () => {
     const pieces = 100_000;
     const query = Array.from({ length: pieces }, (_, i) => `k${i}=v${i}`).join('&');
