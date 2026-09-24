@@ -3,13 +3,13 @@ import { createRequire } from 'module';
 import express from 'express';
 import expressSession from 'express-session';
 import cookieParser from 'cookie-parser';
-import bodyParser from 'body-parser';
 import passport from 'passport';
 import passportLocal from 'passport-local';
 import { createServer as createHttpServer, Server as HttpServer, IncomingMessage } from 'http';
 import {
   Global,
   GlobalData,
+  Route,
   ServerConfig,
   StartupTask,
   getGlobalDataCaches,
@@ -17,6 +17,7 @@ import {
   getStartupTasks,
 } from '@proteinjs/server-api';
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
+import { RequestBodyParsers } from './RequestBodyParsers';
 import { Logger } from '@proteinjs/logger';
 import { RequestDigests } from '@proteinjs/util-node';
 import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
@@ -51,7 +52,7 @@ export async function startServer(config: ServerConfig) {
   GracefulShutdown.install(server, config);
   await runStartupTasks('before server config');
   const routes = getRoutes();
-  configureRequests(app);
+  configureRequests(app, routes);
   const clientBuildReady = initializeHotReloading(app, config);
   configureSession(app, config);
   beforeRequest(app, config);
@@ -111,15 +112,9 @@ async function runStartupTasks(when: StartupTask['when']) {
   });
 }
 
-function configureRequests(app: express.Express) {
+function configureRequests(app: express.Express, routes: Route[]) {
   app.use(cookieParser());
-  app.use(bodyParser.json({ limit: '100mb' }));
-  app.use(
-    bodyParser.urlencoded({
-      extended: true,
-      limit: '100mb',
-    })
-  );
+  RequestBodyParsers.install(app, routes);
   app.disable('x-powered-by');
 }
 

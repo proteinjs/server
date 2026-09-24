@@ -27,6 +27,9 @@
  * the request's own socket), so the keep-alive suite asserts the running instance through the
  * front door instead of re-deriving values from source.
  *
+ * Also serves the raw-body suite: POST /raw-body-route declares `rawBody`, POST /parsed-body-route
+ * does not; each answers with the bytes the server kept for it (base64, or null) beside the parsed body.
+ *
  * Also serves the local-strategy suite: /served, a route any request reaches (one carrying the
  * strategy's `username` + `password` fields included), and /local-strategy, a consumer route
  * driving the registered strategy the passport way (`passport.authenticate('local')`).
@@ -39,6 +42,7 @@ const { inspect } = require('util');
 const expressSession = require('express-session');
 const passport = require('passport');
 const { SourceRepository } = require('@proteinjs/reflection');
+const { RawBody } = require('@proteinjs/server-api');
 const { startServer, GracefulShutdown, Request, SocketIOServerRepo } = require('../../dist/generated/index.js');
 
 const port = Number(process.env.FIXTURE_PORT);
@@ -55,7 +59,6 @@ if (!port) {
  * own (dist/generated/index.js: a source-graph node typed `@proteinjs/server-api/Route` + the link
  * to the object, keyed by the qualified name `<package>/<name>`).
  */
-const slowRouteName = '@proteinjs/server/slowRoute';
 const routeType = {
   packageName: '@proteinjs/server-api',
   name: 'Route',
@@ -64,39 +67,55 @@ const routeType = {
   typeParameters: [],
   directParents: null,
 };
-SourceRepository.merge(
-  JSON.stringify({
-    options: { directed: true, multigraph: false, compound: false },
-    nodes: [
-      {
-        v: slowRouteName,
-        value: {
-          packageName: '@proteinjs/server',
-          name: 'slowRoute',
-          filePath: __filename,
-          qualifiedName: slowRouteName,
-          type: { ...routeType, directParents: [routeType] },
-          isExported: true,
-          isConst: true,
-          sourceType: 0,
+
+/** Registers `route` under `@proteinjs/server/<name>` the way the built dist registers its own. */
+function registerRoute(name, route) {
+  const qualifiedName = `@proteinjs/server/${name}`;
+  SourceRepository.merge(
+    JSON.stringify({
+      options: { directed: true, multigraph: false, compound: false },
+      nodes: [
+        {
+          v: qualifiedName,
+          value: {
+            packageName: '@proteinjs/server',
+            name,
+            filePath: __filename,
+            qualifiedName,
+            type: { ...routeType, directParents: [routeType] },
+            isExported: true,
+            isConst: true,
+            sourceType: 0,
+          },
         },
-      },
-      { v: routeType.qualifiedName },
-    ],
-    edges: [{ v: slowRouteName, w: routeType.qualifiedName, value: 'has type' }],
-  }),
-  {
-    [slowRouteName]: {
-      path: '/slow-route',
-      method: 'get',
-      onRequest: async (request, response) => {
-        const ms = Number(request.query.ms ?? 3000);
-        await new Promise((resolve) => setTimeout(resolve, ms));
-        response.status(200).send('slow-route-done');
-      },
-    },
-  }
-);
+        { v: routeType.qualifiedName },
+      ],
+      edges: [{ v: qualifiedName, w: routeType.qualifiedName, value: 'has type' }],
+    }),
+    { [qualifiedName]: route }
+  );
+}
+
+registerRoute('slowRoute', {
+  path: '/slow-route',
+  method: 'get',
+  onRequest: async (request, response) => {
+    const ms = Number(request.query.ms ?? 3000);
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    response.status(200).send('slow-route-done');
+  },
+});
+
+/**
+ * The raw-body suite's two routes, one declaring `rawBody` and one not: each answers with the bytes
+ * the server kept for it (`RawBody.of`, base64 — null when none) beside the body it parsed.
+ */
+const echoBodies = async (request, response) => {
+  const rawBody = RawBody.of(request);
+  response.status(200).json({ rawBase64: rawBody ? rawBody.toString('base64') : null, parsed: request.body });
+};
+registerRoute('rawBodyRoute', { path: '/raw-body-route', method: 'post', rawBody: true, onRequest: echoBodies });
+registerRoute('parsedBodyRoute', { path: '/parsed-body-route', method: 'post', onRequest: echoBodies });
 
 /**
  * An error that withholds its cause when printed — the shape of a data-layer error whose backend

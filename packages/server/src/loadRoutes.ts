@@ -62,7 +62,8 @@ export function loadDefaultStarRoute(routes: Route[], server: express.Express, c
   }
 }
 
-function getPath(path: string) {
+/** A route's express path: its declared path, rooted. */
+export function getPath(path: string) {
   return path.startsWith('/') ? path : `/${path}`;
 }
 
