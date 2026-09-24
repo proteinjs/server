@@ -1,8 +1,10 @@
+import * as crypto from 'crypto';
 import * as http from 'http';
 import * as net from 'net';
 import * as path from 'path';
 import { ChildProcess, spawn } from 'child_process';
 import { RequestDigests } from '@proteinjs/util-node';
+import { SocketRefusalCode } from '@proteinjs/server-api';
 
 /**
  * A refused socket handshake leaves ONE line on the server — whoever refused it: the session gate
@@ -11,6 +13,11 @@ import { RequestDigests } from '@proteinjs/util-node';
  * line would be reported and grouped as a server error. The line says why in the refuser's words
  * and which device by its coarse IP hash — never the client's address, never a cookie or a
  * session id — so an operator can count refusals per device.
+ *
+ * The session gate's refusal also carries a CODE, the one a client reads to decide the refusal is
+ * final (`SocketRefusalCode.NO_SESSION`, exported by @proteinjs/server-api for both sides): on the
+ * wire in the refusal's `data` — `44{"message":"Unauthorized","data":{"code":"NO_SESSION"}}` — and
+ * on the line, so an operator counts the same refusals the client stops on.
  *
  * On a real server process (spawns the built dist — run `npm run build` first), driving the
  * socket transport's own wire protocol over plain HTTP (the long-polling transport), and reading
@@ -43,11 +50,18 @@ describe('a refused socket handshake leaves one WARN line with the device hash',
     fixture = undefined;
   });
 
-  it('a handshake with no session: refused Unauthorized, one WARN line naming the device by its hash', async () => {
+  it('a handshake with no session is refused with the NO_SESSION code on the wire — the code a client reads, not the words', async () => {
     fixture = await startFixture();
 
     const answer = await connectWithoutSession(fixture.port);
-    expect(answer).toBe('44{"message":"Unauthorized"}');
+    expect(answer).toBe('44{"message":"Unauthorized","data":{"code":"NO_SESSION"}}');
+    expect(JSON.parse(answer.slice(2)).data.code).toBe(SocketRefusalCode.NO_SESSION);
+  }, 30000);
+
+  it('the refusal leaves ONE WARN line carrying the reason, the code and the device by its hash — never the address, a cookie or a session id', async () => {
+    fixture = await startFixture();
+
+    await connectWithoutSession(fixture.port);
     await fixture.waitForLine(/Socket handshake refused/);
 
     const lines = refusalLines(fixture.output());
@@ -55,9 +69,28 @@ describe('a refused socket handshake leaves one WARN line with the device hash',
     expect(lines[0].startsWith(WARN_COLOR)).toBe(true);
     const plain = lines[0].replace(ANSI, '');
     expect(plain).toContain("reason: 'Unauthorized'");
+    expect(plain).toContain("code: 'NO_SESSION'");
     expect(plain).toContain(`device: '${digests.coarseIp('127.0.0.1')}'`);
     expect(plain).not.toContain('127.0.0.1');
     expect(plain).not.toMatch(/connect\.sid|sid/i);
+  }, 30000);
+
+  it('a handshake whose cookie names a session the store no longer holds (one signed out elsewhere) is refused with the same code', async () => {
+    fixture = await startFixture();
+
+    const cookie = `connect.sid=${encodeURIComponent(signedSessionCookie('a-session-signed-out-elsewhere'))}`;
+    const answer = await connectWithoutSession(fixture.port, { Cookie: cookie });
+    expect(answer).toBe('44{"message":"Unauthorized","data":{"code":"NO_SESSION"}}');
+    // The cookie was honored: the store was asked for the session, and had none.
+    expect(fixture.output()).toMatch(/SESSION_READ_METADATA/);
+    await fixture.waitForLine(/Socket handshake refused/);
+
+    const lines = refusalLines(fixture.output());
+    expect(lines).toHaveLength(1);
+    const plain = lines[0].replace(ANSI, '');
+    expect(plain).toContain("code: 'NO_SESSION'");
+    expect(plain).not.toContain('a-session-signed-out-elsewhere');
+    expect(plain).not.toMatch(/connect\.sid/);
   }, 30000);
 
   it('behind the load balancer the device is the client it appended, never the balancer or what the client claimed', async () => {
@@ -88,6 +121,16 @@ describe('a refused socket handshake leaves one WARN line with the device hash',
     expect(fixture.output()).not.toMatch(/Connection error/);
   }, 30000);
 });
+
+/** A session cookie's value as express-session signs it (`s:<id>.<hmac>`), with the fixture's secret. */
+function signedSessionCookie(sessionId: string): string {
+  const mac = crypto
+    .createHmac('sha256', 'graceful-shutdown-test')
+    .update(sessionId)
+    .digest('base64')
+    .replace(/=+$/, '');
+  return `s:${sessionId}.${mac}`;
+}
 
 /** The lines the refusal writes (one write each), as the process wrote them. */
 function refusalLines(output: string): string[] {

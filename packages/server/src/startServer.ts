@@ -410,13 +410,13 @@ async function initializeSocketIO(app: express.Express, server: HttpServer, conf
   io.use(wrapMiddleware(passport.initialize()));
   io.use(wrapMiddleware(passport.session()));
 
-  // Use passport for authentication with Socket.IO
+  // Use passport for authentication with Socket.IO. A handshake with no signed-in session is refused
+  // with the NO_SESSION code (SocketRefusalCode) — the code the client reads as final for that socket.
   io.use((socket: ExtendedSocket, next) => {
     if (socket.request.user) {
       next();
     } else {
-      refusals.refused({ request: socket.request, reason: 'Unauthorized' });
-      next(new Error('Unauthorized'));
+      next(refusals.noSession(socket.request));
     }
   });
 
