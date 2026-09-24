@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.8.4](https://github.com/proteinjs/server/compare/@proteinjs/server@3.8.3...@proteinjs/server@3.8.4) (2026-09-24)
+
+
+### Bug Fixes
+
+* **server:** the request log prints the query's keys, never their values ([cd8f67c](https://github.com/proteinjs/server/commit/cd8f67c04b752409ebcfc26465f8ccc76a9f2de6))
+
+
+
+
+
 ## [3.8.3](https://github.com/proteinjs/server/compare/@proteinjs/server@3.8.2...@proteinjs/server@3.8.3) (2026-09-23)
 
 
