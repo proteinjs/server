@@ -38,6 +38,16 @@ export type HoldObserver = { acquired?: (label: string) => void; released?: (lab
  *        connections are force-closed. Either way the exit code is 0 — a drained shutdown is
  *        not a crash.
  *   SIGINT → exit 0 immediately (dev ctrl-C: fast and quiet; nothing needs flushing).
+ *   An uncaught exception, or a promise rejection nothing handles → the error is written through
+ *     the logger, then exit 1 immediately — no drain: after an uncaught exception the process's
+ *     state is unknown, so it never keeps serving. The exit is Node's own for both (exit 1; a
+ *     rejection reaches the same listener, `origin` naming it, exactly when Node's
+ *     `--unhandled-rejections` mode makes it fatal — the default since Node 15); what changes is
+ *     the PRINTER. Node's fatal printer inspects the error with custom inspection OFF, so it walks
+ *     the error's `cause` past the error's own `util.inspect.custom` hook — the hook an error uses
+ *     to withhold a cause whose words can quote record values (a backend refusal naming the
+ *     colliding key). The logger renders the error through `util.inspect` with hooks honored (or
+ *     the consumer's log writer), so what the error withholds stays withheld on the way out.
  *   exit 86 → NOT this class's concern: `process.exit(86)` is the ServePackageSupervisor
  *     restart-request contract (a liveness monitor giving up on a dependency); it is not
  *     signal-driven and is untouched by these handlers.
@@ -77,7 +87,10 @@ export class GracefulShutdown {
     private config: ServerConfig
   ) {}
 
-  /** Install the SIGTERM/SIGINT handlers for this process's server. Idempotent. */
+  /**
+   * Install the SIGTERM/SIGINT handlers and the fatal-error handler for this process's server.
+   * Idempotent.
+   */
   static install(server: HttpServer, config: ServerConfig): void {
     if (GracefulShutdown.instance) {
       return;
@@ -86,6 +99,7 @@ export class GracefulShutdown {
     GracefulShutdown.instance = instance;
     process.on('SIGTERM', () => void instance.drainAndExit());
     process.on('SIGINT', () => instance.exitNow());
+    process.on('uncaughtException', (error, origin) => instance.exitOnFatalError(error, origin));
   }
 
   /** The readiness seam: `/health-check` reports 503 whenever this is true. */
@@ -205,6 +219,14 @@ export class GracefulShutdown {
     this.shuttingDown = true;
     this.logger.info({ message: `Received SIGINT — exiting immediately` });
     process.exit(0);
+  }
+
+  /** The process's fatal-error boundary (see the class doc): the logger prints, then exit 1. */
+  private exitOnFatalError(error: unknown, origin: NodeJS.UncaughtExceptionOrigin): void {
+    this.shuttingDown = true;
+    const kind = origin === 'unhandledRejection' ? 'Unhandled rejection' : 'Uncaught exception';
+    this.logger.error({ message: `${kind} — exiting 1`, error });
+    process.exit(1);
   }
 
   private drainDelayMs(): number {
