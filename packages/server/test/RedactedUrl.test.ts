@@ -84,6 +84,18 @@ describe('RedactedUrl', () => {
     expect(RedactedUrl.of('/p?a=x%23y')).toBe(`/p?a=${mark}`);
   });
 
+  it('a url that is only a fragment, a `#` inside a query value, and malformed shapes: never the content', () => {
+    // A client error report can name a `location.href` that is all fragment; a `#` after a query
+    // value ends that value (the first `#` rule) rather than riding inside it; and shapes no
+    // browser would send still come back with nothing but marks and separators.
+    expect(RedactedUrl.of('#access=secret')).toBe(`#${mark}`);
+    expect(RedactedUrl.of('/p?a=x#y')).toBe(`/p?a=${mark}#${mark}`);
+    expect(RedactedUrl.of('##')).toBe(`#${mark}`);
+    expect(RedactedUrl.of('#?token=secret')).toBe(`#${mark}`);
+    expect(RedactedUrl.of('?#')).toBe('?#');
+    expect(RedactedUrl.of('')).toBe('');
+  });
+
   it('a very long query costs linear time and redacts every piece', () => {
     const pieces = 100_000;
     const query = Array.from({ length: pieces }, (_, i) => `k${i}=v${i}`).join('&');
