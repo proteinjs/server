@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.4.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.3.0...@proteinjs/server-api@3.4.0) (2026-09-25)
+
+
+### Features
+
+* a route declares rawBody and receives the request body's exact bytes beside the parsed body ([f49957c](https://github.com/brentbahry/server/commit/f49957c31fe703cd24efa3a7d3f2a3cee6ce6b23))
+* **server:** a handshake refused for want of a session carries the NO_SESSION code ([14a1f0e](https://github.com/brentbahry/server/commit/14a1f0e619304b032dd0ea6e643c4155f8614a62))
+
+
+
+
+
 # [3.3.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.2.0...@proteinjs/server-api@3.3.0) (2026-09-17)
 
 

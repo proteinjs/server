@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.9.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.8.5...@proteinjs/server@3.9.0) (2026-09-25)
+
+
+### Bug Fixes
+
+* **server:** a url's fragment never prints — RedactedUrl marks it `#<redacted>`, with or without a query ([540fc4c](https://github.com/proteinjs/server/commit/540fc4ca0d0600f2435defa1288fa3c3228903da))
+* **server:** an uncaught exception or unhandled rejection prints through the logger, never Node's fatal printer ([b43a6f0](https://github.com/proteinjs/server/commit/b43a6f07815c6e70ae722799a027c5ec288c9392))
+
+
+### Features
+
+* a route declares rawBody and receives the request body's exact bytes beside the parsed body ([f49957c](https://github.com/proteinjs/server/commit/f49957c31fe703cd24efa3a7d3f2a3cee6ce6b23))
+* **server:** a handshake refused for want of a session carries the NO_SESSION code ([14a1f0e](https://github.com/proteinjs/server/commit/14a1f0e619304b032dd0ea6e643c4155f8614a62))
+
+
+
+
+
 ## [3.8.5](https://github.com/proteinjs/server/compare/@proteinjs/server@3.8.4...@proteinjs/server@3.8.5) (2026-09-24)
 
 
