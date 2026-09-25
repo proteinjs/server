@@ -13,6 +13,13 @@ export interface Route extends Loadable {
    * the same as every route's.
    */
   rawBody?: boolean;
+  /**
+   * Let this route's page be framed — by its own origin, and by the origins the deployment lists
+   * (`ServerConfig.pages.frameAncestors`). Every page refuses framing unless its route declares this
+   * (`Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY` — `PageSecurityHeaders`
+   * in @proteinjs/server); the declaration is the only way a page is framed, never a header it sets itself.
+   */
+  frameable?: boolean;
   onRequest: (request: express.Request, response: express.Response) => Promise<void>;
 }
 

@@ -13,6 +13,7 @@ import { createReactApp } from './routes/reactApp';
 import { Logger } from '@proteinjs/logger';
 import { Request } from './Request';
 import { RedactedUrl } from './RedactedUrl';
+import { PageSecurityHeaders } from './PageSecurityHeaders';
 
 const logger = new Logger({ name: 'Server' });
 let requestCounter: number = 0;
@@ -32,18 +33,15 @@ export function loadRoutes(routes: Route[], server: express.Express, config: Ser
       continue;
     }
 
-    server[route.method](getPath(route.path), wrapRoute(route.onRequest.bind(route), config));
+    server[route.method](getPath(route.path), wrapRoute(route, config));
   }
 
   for (const wildcardRoute of wildcardRoutes) {
-    server[wildcardRoute.method](
-      getPath(wildcardRoute.path),
-      wrapRoute(wildcardRoute.onRequest.bind(wildcardRoute), config)
-    );
+    server[wildcardRoute.method](getPath(wildcardRoute.path), wrapRoute(wildcardRoute, config));
   }
 
   if (starRoute) {
-    server[starRoute.method](starRoute.path, wrapRoute(starRoute.onRequest.bind(starRoute), config));
+    server[starRoute.method](starRoute.path, wrapRoute(starRoute, config));
   }
 }
 
@@ -58,7 +56,7 @@ export function loadDefaultStarRoute(routes: Route[], server: express.Express, c
 
   if (!starRouteSpecified && (config.staticContent?.bundlePaths || config.staticContent?.bundlesDir)) {
     const reactApp = createReactApp(config);
-    server[reactApp.method](reactApp.path, wrapRoute(reactApp.onRequest.bind(reactApp), config));
+    server[reactApp.method](reactApp.path, wrapRoute(reactApp, config));
   }
 }
 
@@ -67,10 +65,7 @@ export function getPath(path: string) {
   return path.startsWith('/') ? path : `/${path}`;
 }
 
-function wrapRoute(
-  route: (request: express.Request, response: express.Response) => Promise<void>,
-  config: ServerConfig
-) {
+function wrapRoute(route: Route, config: ServerConfig) {
   const handleRequest = async function (
     request: express.Request,
     response: express.Response,
@@ -120,9 +115,14 @@ function wrapRoute(
 
     setRequestTimeout(request, config, requestNumber, loggedUrl);
 
+    // The route's one framing declaration, handed to the headers' owner for this response.
+    if (route.frameable) {
+      PageSecurityHeaders.allowFraming(response);
+    }
+
     // Run route
     try {
-      await route(request, response);
+      await route.onRequest(request, response);
     } catch (error) {
       console.error(error);
     }

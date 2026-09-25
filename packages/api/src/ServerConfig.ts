@@ -4,6 +4,9 @@ import serveStatic = require('serve-static');
 
 type MakeMandatory<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
 
+/** An origin as CSP's `frame-ancestors` takes one: `scheme://host`, a port when not the scheme's default. */
+export type PageOrigin = `${'http' | 'https'}://${string}`;
+
 export interface ServerConfig {
   /**
    * Runs:
@@ -64,6 +67,21 @@ export interface ServerConfig {
      * (plus any preStop hook). Default: 240000 — a chat turn runs minutes.
      */
     turnDrainMs?: number;
+  };
+  /**
+   * The pages this server sends — every HTML response — and the security headers they carry
+   * (`PageSecurityHeaders` in @proteinjs/server: every page refuses framing unless its route declares
+   * `frameable`; `X-Content-Type-Options: nosniff` on every response; `Referrer-Policy:
+   * strict-origin-when-cross-origin` on every page).
+   */
+  pages?: {
+    /**
+     * The origins allowed to frame a route that declares `frameable` (`Route.frameable`), beside the
+     * page's own origin: `['https://www.example.com']`. Each entry is exactly an origin (a path, a
+     * query, a default port or a trailing slash refuses to boot, naming the entry). A page whose route
+     * does not declare `frameable` refuses every framer whatever this lists.
+     */
+    frameAncestors?: PageOrigin[];
   };
   request?: {
     disableRequestLogging?: boolean;

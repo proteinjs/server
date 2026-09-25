@@ -25,6 +25,7 @@ import { SocketHandshakeRefusals } from './SocketHandshakeRefusals';
 import { DevClientBuild } from './DevClientBuild';
 import { GracefulShutdown } from './GracefulShutdown';
 import { RedactedUrl } from './RedactedUrl';
+import { PageSecurityHeaders } from './PageSecurityHeaders';
 
 const staticContentPath = '/static/';
 const logger = new Logger({ name: 'Server' });
@@ -52,7 +53,7 @@ export async function startServer(config: ServerConfig) {
   GracefulShutdown.install(server, config);
   await runStartupTasks('before server config');
   const routes = getRoutes();
-  configureRequests(app, routes);
+  configureRequests(app, routes, config);
   const clientBuildReady = initializeHotReloading(app, config);
   configureSession(app, config);
   beforeRequest(app, config);
@@ -112,7 +113,10 @@ async function runStartupTasks(when: StartupTask['when']) {
   });
 }
 
-function configureRequests(app: express.Express, routes: Route[]) {
+function configureRequests(app: express.Express, routes: Route[], config: ServerConfig) {
+  // First of all: every response the process sends — a route's, the https redirect, express's
+  // own 404, static file bytes — carries the security headers its class calls for.
+  PageSecurityHeaders.install(app, config);
   app.use(cookieParser());
   RequestBodyParsers.install(app, routes);
   app.disable('x-powered-by');
