@@ -129,8 +129,17 @@ const echoBodies = async (request, response) => {
   const rawBody = RawBody.of(request);
   response.status(200).json({ rawBase64: rawBody ? rawBody.toString('base64') : null, parsed: request.body });
 };
-register('@proteinjs/server-api/Route', 'rawBodyRoute', { path: '/raw-body-route', method: 'post', rawBody: true, onRequest: echoBodies });
-register('@proteinjs/server-api/Route', 'parsedBodyRoute', { path: '/parsed-body-route', method: 'post', onRequest: echoBodies });
+register('@proteinjs/server-api/Route', 'rawBodyRoute', {
+  path: '/raw-body-route',
+  method: 'post',
+  rawBody: true,
+  onRequest: echoBodies,
+});
+register('@proteinjs/server-api/Route', 'parsedBodyRoute', {
+  path: '/parsed-body-route',
+  method: 'post',
+  onRequest: echoBodies,
+});
 
 /**
  * An error that withholds its cause when printed — the shape of a data-layer error whose backend
