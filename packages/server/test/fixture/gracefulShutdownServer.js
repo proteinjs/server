@@ -44,6 +44,13 @@
  * Also serves the raw-body suite: POST /raw-body-route declares `rawBody`, POST /parsed-body-route
  * does not; each answers with the bytes the server kept for it (base64, or null) beside the parsed body.
  *
+ * Also serves the page-security-headers suite: GET /plain-page (HTML, declares nothing — refuses
+ * framing like every page) and GET /frameable-page (HTML, declares `frameable`: its own origin may
+ * frame it, and the origins the deployment lists); the fixture's own directory is its static dir,
+ * so /static/gracefulShutdownServer.js answers file bytes. FIXTURE_PAGES (JSON) is the deployment's
+ * ServerConfig.pages — frame ancestors, Strict-Transport-Security, Permissions-Policy, the
+ * Content-Security-Policy — and FIXTURE_ORIGIN its ServerConfig.origin, the https redirect's target.
+ *
  * Also serves the local-strategy suite: /served, a route any request reaches (one carrying the
  * strategy's `username` + `password` fields included), and /local-strategy, a consumer route
  * driving the registered strategy the passport way (`passport.authenticate('local')`).
@@ -206,6 +213,25 @@ register('@proteinjs/server-api/Route', 'streamedRoute', {
         resolve();
       }, 400);
     }),
+});
+
+/**
+ * The page-security-headers suite's two pages, one declaring `frameable` and one not: each an HTML
+ * document naming its own path, so the suite reads the framing policy the server stamped on it.
+ */
+const sendPage = async (request, response) => {
+  response.status(200).send(`<!DOCTYPE html><html><body>${request.path}</body></html>`);
+};
+register('@proteinjs/server-api/Route', 'plainPage', {
+  path: '/plain-page',
+  method: 'get',
+  onRequest: sendPage,
+});
+register('@proteinjs/server-api/Route', 'frameablePage', {
+  path: '/frameable-page',
+  method: 'get',
+  frameable: true,
+  onRequest: sendPage,
 });
 
 /**
@@ -426,9 +452,13 @@ startServer({
       next();
     },
   },
-  // A bundle pointer so the '*' react-app route serves its HTML — the html-cache-control
-  // suite asserts response headers on the page the app actually ships. No staticContentDir:
-  // nothing needs the bundle to resolve, only the page response to render. With
+  // The deployment's one public origin, when a suite declares one (FIXTURE_ORIGIN → ServerConfig.origin):
+  // where the https redirect sends a plain-http request.
+  origin: process.env.FIXTURE_ORIGIN || undefined,
+  // A bundle pointer so the '*' react-app route serves its HTML — the html-cache-control and
+  // page-security-headers suites assert response headers on the page the app actually ships. The
+  // static dir is this fixture's own directory (file bytes for the page-security-headers suite:
+  // /static/gracefulShutdownServer.js); nothing needs the bundle itself to resolve. With
   // FIXTURE_STATIC_DIR set, the served shape instead: a static dir with a bundles dir under it
   // (the page lists the bundles from there) and, with FIXTURE_BUNDLES_URL, the declared place
   // the bundles are served from — the bundles-redirect suite's two roads.
@@ -438,7 +468,10 @@ startServer({
         bundlesDir: 'bundles',
         bundlesUrl: process.env.FIXTURE_BUNDLES_URL || undefined,
       }
-    : { bundlePaths: ['bundles/app.test.js'] },
+    : { bundlePaths: ['bundles/app.test.js'], staticContentDir: __dirname },
+  // The page security declarations, when a suite makes them (FIXTURE_PAGES, JSON → ServerConfig.pages):
+  // the frame ancestors, Strict-Transport-Security, Permissions-Policy, Content-Security-Policy.
+  pages: process.env.FIXTURE_PAGES ? JSON.parse(process.env.FIXTURE_PAGES) : undefined,
   shutdown: {
     drainDelayMs: process.env.FIXTURE_DRAIN_DELAY_MS ? Number(process.env.FIXTURE_DRAIN_DELAY_MS) : undefined,
     drainTimeoutMs: process.env.FIXTURE_DRAIN_TIMEOUT_MS ? Number(process.env.FIXTURE_DRAIN_TIMEOUT_MS) : undefined,

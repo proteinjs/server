@@ -27,6 +27,8 @@ import { SocketHandshakeRefusals } from './SocketHandshakeRefusals';
 import { DevClientBuild } from './DevClientBuild';
 import { GracefulShutdown } from './GracefulShutdown';
 import { RedactedUrl } from './RedactedUrl';
+import { PageSecurityHeaders } from './PageSecurityHeaders';
+import { DeclaredOrigin } from './DeclaredOrigin';
 
 const staticContentPath = '/static/';
 const logger = new Logger({ name: 'Server' });
@@ -54,7 +56,7 @@ export async function startServer(config: ServerConfig) {
   GracefulShutdown.install(server, config);
   await runStartupTasks('before server config');
   const routes = getRoutes();
-  configureRequests(app, routes);
+  configureRequests(app, routes, config);
   const clientBuildReady = initializeHotReloading(app, config);
   configureSession(app, config);
   beforeRequest(app, config);
@@ -63,7 +65,7 @@ export async function startServer(config: ServerConfig) {
     app,
     config
   );
-  configureHttps(app); // registering here forces static content to be redirected to https
+  configureHttps(app, config); // registering here forces static content to be redirected to https
   configureStaticContentRouter(app, config);
   loadRoutes(
     routes.filter((route) => !route.useHttp),
@@ -114,7 +116,10 @@ async function runStartupTasks(when: StartupTask['when']) {
   });
 }
 
-function configureRequests(app: express.Express, routes: Route[]) {
+function configureRequests(app: express.Express, routes: Route[], config: ServerConfig) {
+  // First of all: every response the process sends — a route's, the https redirect, express's
+  // own 404, static file bytes — carries the security headers its class calls for.
+  PageSecurityHeaders.install(app, config);
   ResponseCompression.install(app);
   app.use(cookieParser());
   RequestBodyParsers.install(app, routes);
@@ -263,15 +268,31 @@ function createWebpackConfigOverlay(config: ServerConfig, webpack: any, appRequi
   return devConfig;
 }
 
-function configureHttps(app: express.Express) {
+/**
+ * A plain-http request is redirected to https — at the deployment's declared origin
+ * (`ServerConfig.origin`: the Location is `<origin><path and query>`), never at a Location built
+ * from the request's own Host header, which any client writes; a process that declares no origin
+ * can only name the host the request carried. Skipped in DEVELOPMENT (a dev server is plain http)
+ * and for a request already answered. An http origin outside DEVELOPMENT refuses to boot: the
+ * redirect would send every request back to plain http.
+ */
+function configureHttps(app: express.Express, config: ServerConfig) {
+  const origin = config.origin ? DeclaredOrigin.of(config.origin, 'ServerConfig.origin') : undefined;
+  if (origin && !origin.startsWith('https://') && !process.env.DEVELOPMENT) {
+    throw new Error(
+      `ServerConfig.origin: ${origin} is not an https origin — plain-http requests are redirected there; a plain-http process sets DEVELOPMENT`
+    );
+  }
+
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
     if (request.protocol == 'https' || response.headersSent || process.env.DEVELOPMENT) {
       next();
       return;
     }
 
-    logger.debug({ message: `Redirecting to https: ${request.headers.host}${RedactedUrl.of(request.url)}` });
-    response.redirect('https://' + request.headers.host + request.url);
+    const target = origin ?? `https://${request.headers.host}`;
+    logger.debug({ message: `Redirecting to https: ${target}${RedactedUrl.of(request.url)}` });
+    response.redirect(target + request.url);
   });
 }
 
