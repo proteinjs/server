@@ -39,9 +39,9 @@ jobs:
         with:
           node-version: '22'
   
-      - name: CI glue self-test (LockFloors.js)
+      - name: CI glue self-test (LockFloors.js, MintServed.js)
         # node:test, needs no install; fails the job before any minute is spent on install/build.
-        run: node --test .github/scripts/LockFloors.test.js
+        run: node --test .github/scripts/LockFloors.test.js .github/scripts/MintServed.test.js
 
       - name: Setup NPM authentication
         run: |
@@ -112,17 +112,25 @@ jobs:
         # INSTALLED entry — the pre-publish stamp the build's `npm i` wrote and the lock commit
         # above shipped — stays at the old version, so main refuses `npm ci` in every consumer
         # (EUSAGE: "lock file's @proteinjs/server-api@3.2.0 does not satisfy
-        # @proteinjs/server-api@3.3.0") until someone re-stamps by hand. Now that the registry
-        # serves the mint: LockFloors.js --restamp resolves the torn trees only (`npm i
+        # @proteinjs/server-api@3.3.0") until someone re-stamps by hand. The registry serving the
+        # mint is a WAIT, not an assumption: `lerna publish` returns on the registry's accept and
+        # the packument a resolver reads lags it (a stamp asked before it serves fails with ETARGET
+        # and the step leaves the tear — proteinjs/db run 36295867264, server 36075669002, user
+        # 36083990691), so MintServed.js polls `npm view <name>@<version> version` for every tag
+        # this run's `lerna publish` made (the tags at HEAD), 10 s apart on one 5-minute clock, one
+        # "served after N s" line per package; a package still not served is a WARNING line and exit
+        # 1, and the re-stamp still tries (`|| [ $? -eq 1 ]`: only a timeout goes on; git or npm
+        # unrunnable stops here). Then LockFloors.js --restamp resolves the torn trees only (`npm i
         # --package-lock-only` with this job's npm 10 — lock stamps are npm-major dependent), proves
         # every tree coherent, and the locks ride main as the mint's second commit; a mint that
         # moved no consumer floor commits nothing. Best-effort by design (continue-on-error): the
-        # packages are published, so a registry still not serving the mint after three rounds leaves
-        # main as lerna left it, this step red, the job green; `node .github/scripts/LockFloors.js
-        # --restamp` under npm 10, committed, is the hand recipe.
+        # packages are published, so a registry still not serving the mint leaves main as lerna left
+        # it, this step red, the job green; `node .github/scripts/LockFloors.js --restamp` under npm
+        # 10, committed, is the hand recipe.
         if: steps.tip.outputs.is_tip == 'true'
         continue-on-error: true
         run: |
+          node .github/scripts/MintServed.js || [ $? -eq 1 ]
           node .github/scripts/LockFloors.js --restamp
           git add -u -- package-lock.json '*/package-lock.json'
           if git diff --staged --quiet; then
