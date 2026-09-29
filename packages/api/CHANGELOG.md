@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.5.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.4.0...@proteinjs/server-api@3.5.0) (2026-09-29)
+
+
+### Features
+
+* **server:** the socket transport's message limit is declared, not inherited ([4cdaca0](https://github.com/brentbahry/server/commit/4cdaca024bf62ef03c54ee9ed7df7a81c1c43ba1))
+
+
+
+
+
 # [3.4.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.3.0...@proteinjs/server-api@3.4.0) (2026-09-25)
 
 
