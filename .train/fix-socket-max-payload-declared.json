@@ -1,6 +1,0 @@
-{
-  "branch": "fix/socket-max-payload-declared",
-  "packages": ["api", "server"],
-  "suites": ["packages/server/test/socketMaxPayload.test.ts"],
-  "removes": []
-}
