@@ -13,3 +13,4 @@ export * from './src/ServerRenderedScript';
 export * from './src/ServerRenderedHeadTag';
 export * from './src/StartupTask';
 export * from './src/SocketRefusalCode';
+export * from './src/SocketMaxPayload';

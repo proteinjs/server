@@ -1,6 +1,7 @@
 import { Server as HttpServer, IncomingMessage } from 'http';
-import { Socket, Server as SocketIOServer } from 'socket.io';
+import { Socket, Server as SocketIOServer, type ServerOptions } from 'socket.io';
 import { getDefaultSocketIOServerFactory } from '@proteinjs/event';
+import { SOCKET_MAX_PAYLOAD_BYTES } from '@proteinjs/server-api';
 
 const getGlobal = (): any => {
   if (typeof window !== 'undefined') {
@@ -32,10 +33,11 @@ export class SocketIOServerRepo {
       throw new Error('Socket IO Server already initialized');
     }
 
+    // A factory that builds the server itself owns passing `transportOptions()` to it too.
     const socketIOServerFactory = getDefaultSocketIOServerFactory();
     const socketIOServer = socketIOServerFactory
       ? await socketIOServerFactory.createSocketIOServer(httpServer)
-      : new SocketIOServer(httpServer);
+      : new SocketIOServer(httpServer, SocketIOServerRepo.transportOptions());
     getGlobal().__proteinjs_server_SocketIOServer = socketIOServer;
 
     return getGlobal().__proteinjs_server_SocketIOServer;
@@ -53,5 +55,16 @@ export class SocketIOServerRepo {
 
   static getSocketIOServerIfExists(): SocketIOServer | undefined {
     return getGlobal().__proteinjs_server_SocketIOServer;
+  }
+
+  /**
+   * The transport's options, declared rather than inherited: the most bytes one message may carry
+   * is `SOCKET_MAX_PAYLOAD_BYTES` (@proteinjs/server-api — the one number the server's transport and
+   * the clients that bound what they send both read). Left to the transport's own default the limit
+   * is invisible to every client, and a client whose message crosses it has its socket closed with
+   * no word of why ("transport error").
+   */
+  static transportOptions(): Partial<ServerOptions> {
+    return { maxHttpBufferSize: SOCKET_MAX_PAYLOAD_BYTES };
   }
 }
