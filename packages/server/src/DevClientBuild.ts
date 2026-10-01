@@ -16,7 +16,8 @@ export type DevClientBuildInfo = {
   /**
    * The entrypoint's script files (`app.js`, `vendor.js`, …) in the compile's own load order —
    * the dev page's bundle tags are rendered from THIS list (reactApp.ts), so the page follows the
-   * chunk graph the webpack config declares instead of a hard-coded pair of names.
+   * chunk graph the webpack config declares instead of a hard-coded pair of names. Never a
+   * hot-update chunk (see `fromStats`).
    */
   assets: string[];
 };
@@ -28,10 +29,16 @@ export type DevClientBuildStats = {
   errors?: unknown[];
   /** Each entrypoint's files in the compile's own load order (webpack 4 named them as strings). */
   entrypoints?: Record<string, { assets?: (string | { name: string })[] }>;
+  /** Every asset of the compile, with the info webpack declared on it. */
+  assets?: { name: string; info?: { hotModuleReplacement?: boolean } }[];
 };
 
 export class DevClientBuild {
-  /** What the compile's `done` hook asks `stats.toJson` for — only the fields a record reads. */
+  /**
+   * What the compile's `done` hook asks `stats.toJson` for — only the fields a record reads.
+   * `assets` carries webpack's own info on each asset; `cachedAssets` keeps the ones an incremental
+   * compile left untouched in that list (under `all: false` they are otherwise dropped).
+   */
   static readonly STATS_OPTIONS = {
     all: false,
     hash: true,
@@ -39,6 +46,8 @@ export class DevClientBuild {
     errors: true,
     entrypoints: true,
     chunkGroupAssets: true,
+    assets: true,
+    cachedAssets: true,
   } as const;
 
   private static current: DevClientBuildInfo | undefined;
@@ -51,7 +60,18 @@ export class DevClientBuild {
     return this.current;
   }
 
-  /** The record of one completed compile, from its stats. */
+  /**
+   * The record of one completed compile, from its stats.
+   *
+   * `assets` is the entrypoints' script files, in the compile's own load order, LESS the hot-update
+   * chunks: on every incremental compile HotModuleReplacementPlugin emits
+   * `<entry>.<previous hash>.hot-update.js` and adds it to the entry chunk's files, so the stats'
+   * entrypoint listing carries it beside the entry's own scripts. That chunk is an HMR payload for a
+   * page already running the previous compile (it calls `webpackHotUpdate…` on a runtime that must
+   * already exist) — injected into a fresh page load it throws and the page is broken until the next
+   * full compile. Webpack declares what each asset is (`info.hotModuleReplacement`), and that
+   * declaration, never a file name, is what leaves them out.
+   */
   static fromStats(stats: DevClientBuildStats): DevClientBuildInfo {
     return {
       hash: stats.hash,
@@ -64,13 +84,16 @@ export class DevClientBuild {
 
   /**
    * The entrypoints' script files in the compile's own load order — what the dev page's bundle
-   * tags render (reactApp.ts). Source maps are not scripts.
+   * tags render (reactApp.ts). Source maps are not scripts; hot-update chunks are not page scripts.
    */
   private static entrypointScripts(stats: DevClientBuildStats): string[] {
+    const hotUpdates = new Set(
+      (stats.assets ?? []).filter((asset) => asset.info?.hotModuleReplacement).map((asset) => asset.name)
+    );
     return Object.values(stats.entrypoints ?? {}).flatMap((entrypoint) =>
       (entrypoint.assets ?? [])
         .map((asset) => (typeof asset === 'string' ? asset : asset.name))
-        .filter((name) => name.endsWith('.js'))
+        .filter((name) => name.endsWith('.js') && !hotUpdates.has(name))
     );
   }
 }

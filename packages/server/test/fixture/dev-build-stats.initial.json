@@ -1,0 +1,70 @@
+{
+  "hash": "d6f2b54ca7861d44af32",
+  "time": 81,
+  "assetsByChunkName": {
+    "app": ["app.js"],
+    "vendor": ["vendor.js"]
+  },
+  "assets": [
+    {
+      "type": "asset",
+      "name": "vendor.js",
+      "size": 62942,
+      "emitted": true,
+      "comparedForEmit": false,
+      "cached": false,
+      "info": {
+        "javascriptModule": false,
+        "related": {
+          "sourceMap": "vendor.js.map"
+        },
+        "size": 62942
+      },
+      "chunkNames": ["vendor"],
+      "chunkIdHints": ["vendor"],
+      "auxiliaryChunkNames": [],
+      "auxiliaryChunkIdHints": [],
+      "filteredRelated": 1
+    },
+    {
+      "type": "asset",
+      "name": "app.js",
+      "size": 43331,
+      "emitted": true,
+      "comparedForEmit": false,
+      "cached": false,
+      "info": {
+        "javascriptModule": false,
+        "related": {
+          "sourceMap": "app.js.map"
+        },
+        "size": 43331
+      },
+      "chunkNames": ["app"],
+      "chunkIdHints": [],
+      "auxiliaryChunkNames": [],
+      "auxiliaryChunkIdHints": [],
+      "filteredRelated": 1
+    }
+  ],
+  "entrypoints": {
+    "app": {
+      "name": "app",
+      "assets": [
+        {
+          "name": "vendor.js",
+          "size": 62942
+        },
+        {
+          "name": "app.js",
+          "size": 43331
+        }
+      ],
+      "filteredAssets": 0,
+      "assetsSize": 106273,
+      "filteredAuxiliaryAssets": 2,
+      "auxiliaryAssetsSize": 102917
+    }
+  },
+  "errors": []
+}
