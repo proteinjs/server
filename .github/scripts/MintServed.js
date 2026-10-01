@@ -9,28 +9,35 @@ const { spawnSync } = require('child_process');
  * new version to a resolver — the packument a `npm i` reads lags the accept by seconds to minutes
  * (run 36295867264: the re-stamp asked for @proteinjs/db-file@^1.10.0 at 05:04:51Z and got ETARGET
  * "No matching version found"; the registry served 1.10.0 about 40 s later). LockFloors.js --restamp
- * throws on that ETARGET — its own retry rounds only follow a stamp that RAN — so the re-stamp step
- * went red and main stayed torn until a hand stamp.
+ * then threw on that ETARGET, so the re-stamp step went red and main stayed torn until a hand stamp.
  *
  * THE WAIT: for every mint — the `<name>@<version>` tags lerna's release commit carries (`git tag
  * --points-at HEAD` right after `lerna publish`), or the mints named on the command line — poll
- * `npm view <name>@<version> version` until it answers the version, 10 s apart, one 5-minute clock
+ * `npm view <name>@<version> version` until it answers the version, 10 s apart, one 15-minute clock
  * for the whole mint (a lag is the registry's, shared by every package of the publish; one bound
  * keeps the finalize job inside its own). One line per package ("served after N s"); a package the
  * registry still does not serve at the deadline is a WARNING line naming it, and the caller goes on
  * to the re-stamp anyway — LockFloors is the judge, this is the wait.
  *
+ * THE CLOCK'S SIZE: the lag grows with the publish. A ten-package publish (run 36818699801) had its
+ * first package served 63 s after the accept and its last about 450 s after it, past the 5-minute
+ * clock the wait first shipped with; the re-stamp that followed hit ETARGET on that package and no
+ * lock commit landed. Fifteen minutes covers the observed lag twice over; the finalize job's own
+ * bound (timeout-minutes in the publish workflow) is sized to hold this wait plus the re-stamp's
+ * retry clock plus the push. LockFloors --restamp retries a stamp the registry refuses (ETARGET /
+ * E404) on its own clock, so a package served a minute after this wait expired still lands.
+ *
  *   node .github/scripts/MintServed.js                        every tag at HEAD
  *   node .github/scripts/MintServed.js --ref <sha>            every tag at <sha>
  *   node .github/scripts/MintServed.js <name>@<version> …     these mints (a hand run at any ref)
- *   --timeout <s>  the shared clock (default 300) · --interval <s>  between polls (default 10)
+ *   --timeout <s>  the shared clock (default 900) · --interval <s>  between polls (default 10)
  * Exit 0 every mint served · 1 a mint not served at the deadline (warned) · 2 git or npm unrunnable.
  * The publish workflow runs it under `|| [ $? -eq 1 ]`: a timeout goes on to the re-stamp, an
  * unrunnable wait stops the (best-effort) step.
  */
 
 const VIEW_ARGS = ['view', '--prefer-online', '--no-audit', '--no-fund'];
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 const DEFAULT_INTERVAL_MS = 10 * 1000;
 const EXIT = { OK: 0, TIMED_OUT: 1, FAIL: 2 };
 /** lerna's independent-mode tag: `<name>@<version>` where the name may carry a scope (`@scope/name@1.2.3`). */

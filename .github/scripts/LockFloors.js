@@ -29,8 +29,13 @@ const { spawnSync } = require('child_process');
  *                                                 installs).
  *   node .github/scripts/LockFloors.js --restamp  the fix — `npm i --package-lock-only
  *                                                 --ignore-scripts --no-audit --no-fund` in the torn
- *                                                 trees only, judged again; retried while the registry
- *                                                 is not yet serving the publish. The publish workflow
+ *                                                 trees only, judged again; a stamp the registry
+ *                                                 refuses because it does not serve the floor yet
+ *                                                 (ETARGET / E404 — the resolver lags the publish's
+ *                                                 accept by minutes) is retried 20 s apart on one
+ *                                                 5-minute clock (`--retry <s>`), then reported torn
+ *                                                 naming the floor it never served; any other stamp
+ *                                                 failure stops it (2). The publish workflow
  *                                                 runs it right after `lerna publish` and commits the
  *                                                 locks as the release's second commit. Refused (64)
  *                                                 under any npm major but CI's (read from the
@@ -58,24 +63,30 @@ const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies'];
 const WORKFLOWS_DIR = path.join('.github', 'workflows');
 /** actions/setup-node's major -> the npm major it ships. */
 const NODE_TO_NPM_MAJOR = { 16: 8, 18: 10, 20: 10, 22: 10, 24: 11 };
+/** --restamp's retry: one clock shared by every torn tree, the rounds this far apart. */
+const DEFAULT_RETRY_MS = 5 * 60 * 1000;
+const DEFAULT_RETRY_WAIT_MS = 20 * 1000;
+/** npm's codes for "the registry serves no such version (yet)": ETARGET (the packument lacks the version), E404 (no packument — a package's first publish). A stamp refused with one is retried; any other failure is thrown. */
+const REGISTRY_LAG_CODES = /^code (ETARGET|E404)$/;
 const EXIT = { OK: 0, TORN: 1, FAIL: 2, NPM_MAJOR: 64 };
 
 class NpmMajorMismatch extends Error {}
 
 class LockFloors {
-  constructor({ repoRoot, npmBin, ciNpmMajor, env = process.env, log = console.log, sleep } = {}) {
+  constructor({ repoRoot, npmBin, ciNpmMajor, env = process.env, log = console.log, sleep, now } = {}) {
     this.repoRoot = repoRoot || path.resolve(__dirname, '..', '..');
     this.npmBin = npmBin || 'npm';
     this.ciNpmMajor = ciNpmMajor; // read from the workflows when --restamp needs it
     this.env = env;
     this.log = log;
     this.sleep = sleep || ((ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms));
+    this.now = now || Date.now;
   }
 
   /** The CLI: the verdict printed, the exit code returned. */
-  run({ restamp = false, attempts, waitMs } = {}) {
+  run({ restamp = false, budgetMs, waitMs } = {}) {
     try {
-      const result = restamp ? this.restamp({ attempts, waitMs }) : this.check();
+      const result = restamp ? this.restamp({ budgetMs, waitMs }) : this.check();
       this.log(LockFloors.report(result));
       return result.ok ? EXIT.OK : EXIT.TORN;
     } catch (err) {
@@ -93,33 +104,54 @@ class LockFloors {
   }
 
   /**
-   * The fix: stamp the torn trees with CI's npm major, judge again; up to `attempts` rounds
-   * `waitMs` apart while the registry catches up with a publish. Never touches a tree that agrees.
-   * Returns the final verdict + { stamped: [rel], rounds }.
+   * The fix: stamp the torn trees with CI's npm major, judge again; rounds `waitMs` apart while a
+   * tree stays torn and the clock (`budgetMs`, one for every tree) holds. A stamp npm refuses with
+   * ETARGET / E404 is the registry not yet serving the publish — the tree stays torn for the next
+   * round and the refusal is kept for the report, never thrown; any other stamp failure throws.
+   * Never touches a tree that agrees. Returns the final verdict + { stamped: [rel], rounds }, each
+   * still-torn tree carrying `stampError` (npm's lines from its last refused stamp).
    */
-  restamp({ attempts = 3, waitMs = 20000 } = {}) {
+  restamp({ budgetMs = DEFAULT_RETRY_MS, waitMs = DEFAULT_RETRY_WAIT_MS } = {}) {
     const npm = this.requireCiNpm();
     const stamped = new Set();
+    const refused = new Map(); // rel -> npm's lines from the last stamp the registry refused
+    const start = this.now();
     let result = this.check();
     let rounds = 0;
-    while (!result.ok && rounds < attempts) {
+    while (!result.ok && (rounds === 0 || this.now() - start < budgetMs)) {
       rounds += 1;
       if (rounds > 1) {
-        this.log(`round ${rounds}/${attempts}: still torn — waiting ${waitMs / 1000}s for the registry`);
-        this.sleep(waitMs);
+        const left = budgetMs - (this.now() - start);
+        const wait = Math.min(waitMs, left);
+        this.log(
+          `round ${rounds}: still torn — waiting ${Math.round(wait / 1000)} s for the registry (${Math.round(left / 1000)} s left on the ${Math.round(budgetMs / 1000)} s clock)`
+        );
+        this.sleep(wait);
       }
       for (const tree of result.trees.filter((t) => !t.ok)) {
         this.log(`stamping ${tree.label} (npm ${npm.version}: ${STAMP_ARGS.join(' ')})`);
         const out = this.npm(STAMP_ARGS, tree.dir);
-        if (out.status !== 0)
-          throw new Error(
-            `npm ${STAMP_ARGS.join(' ')} failed in ${tree.label}:\n${LockFloors.npmErrorLines(out).join('\n')}`
-          );
-        stamped.add(tree.rel);
+        if (out.status === 0) {
+          stamped.add(tree.rel);
+          refused.delete(tree.rel);
+          continue;
+        }
+        const lines = LockFloors.npmErrorLines(out);
+        if (!lines.some((line) => REGISTRY_LAG_CODES.test(line)))
+          throw new Error(`npm ${STAMP_ARGS.join(' ')} failed in ${tree.label}:\n${lines.join('\n')}`);
+        refused.set(tree.rel, lines);
+        this.log(
+          `${tree.label}: the registry does not serve a floor yet (${lines.join('; ')}) — retried while the clock holds`
+        );
       }
       result = this.check();
     }
-    return { ...result, stamped: [...stamped], rounds };
+    return {
+      ...result,
+      trees: result.trees.map((t) => ({ ...t, stampError: t.ok ? [] : refused.get(t.rel) || [] })),
+      stamped: [...stamped],
+      rounds,
+    };
   }
 
   static report({ ok, trees, stamped = [], rounds = 0 }) {
@@ -135,6 +167,7 @@ class LockFloors {
       );
       lines.push(`  ${t.ok ? 'ok  ' : 'TORN'}  ${t.label}${floors.length ? ` — ${floors.join(', ')}` : ''}`);
       if (!t.ok) for (const l of t.npmError) lines.push(`          ${l}`);
+      if (!t.ok) for (const l of t.stampError || []) lines.push(`          last stamp: ${l}`);
     }
     if (stamped.length) lines.push(`  stamped ${stamped.join(', ')} (${rounds} round${rounds === 1 ? '' : 's'})`);
     const torn = trees.filter((t) => !t.ok).map((t) => t.label);
@@ -314,17 +347,32 @@ class LockFloors {
   }
 }
 
-module.exports = { LockFloors, EXIT, CHECK_ARGS, STAMP_ARGS, NpmMajorMismatch };
+module.exports = {
+  LockFloors,
+  EXIT,
+  CHECK_ARGS,
+  STAMP_ARGS,
+  NpmMajorMismatch,
+  DEFAULT_RETRY_MS,
+  DEFAULT_RETRY_WAIT_MS,
+};
 
 if (require.main === module) {
   const args = process.argv.slice(2);
-  const opts = { restamp: false, root: undefined };
+  const opts = { restamp: false, root: undefined, budgetMs: undefined };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === '--restamp') opts.restamp = true;
     else if (arg === '--root') opts.root = path.resolve(args[(i += 1)] || '');
     else if (arg.startsWith('--root=')) opts.root = path.resolve(arg.slice('--root='.length));
-    else {
+    else if (arg === '--retry') {
+      const seconds = Number(args[(i += 1)]);
+      if (!Number.isFinite(seconds) || seconds < 0) {
+        console.error(`LockFloors: --retry wants a number of seconds, got ${JSON.stringify(args[i])}`);
+        process.exit(EXIT.FAIL);
+      }
+      opts.budgetMs = seconds * 1000;
+    } else {
       console.error(`LockFloors: unknown argument ${arg}`);
       process.exit(EXIT.FAIL);
     }

@@ -189,6 +189,19 @@ test("the mints are lerna's tags on the release commit: every <name>@<version> t
   assert.equal(stub.asks().length, 2, 'nothing asked for the untagged ref');
 });
 
+test('a registry lagging 450 s behind the accept (the stub answers on the 46th ask, 10 s apart — the lag a ten-package publish showed): the DEFAULT clock covers it — "served after 450 s", nothing timed out', () => {
+  const root = tmp();
+  const stub = stubNpm(root, { serveOn: 46 });
+  const c = clock();
+  const { out, log } = lines();
+  const wait = new MintServed({ repoRoot: root, npmBin: stub.bin, env: stub.env, log, sleep: c.sleep, now: c.now });
+  const result = wait.wait([MINT], { intervalMs: 10000 });
+  assert.deepEqual(result.timedOut, [], 'the default clock outlasts a 450 s lag');
+  assert.deepEqual(result.served, [{ ...MINT, afterMs: 450000 }]);
+  assert.equal(stub.asks().length, 46, 'asked every 10 s until the 46th ask answered');
+  assert.deepEqual(out, ['@proteinjs/fixture-common@2.0.0: served after 450 s']);
+});
+
 test('a mint that is not <name>@<version>, or a git the wait cannot read: refused (exit 2), named — never a poll', () => {
   const root = tmp();
   const stub = stubNpm(root, { serveOn: 1 });

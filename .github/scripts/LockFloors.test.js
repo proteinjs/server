@@ -98,8 +98,11 @@ function readLock(root, rel) {
  * The stub npm: `--version` answers STUB_NPM_VERSION; `i --package-lock-only` (the registry) logs its
  * cwd and, from the STUB_STAMP_ON-th call on, rewrites the lock's installed entry to STUB_STAMP_TO —
  * a registry that serves the publish only after a lag; everything else is the real npm on PATH.
+ * `refuse: '<name>@<range>'`: before the STUB_STAMP_ON-th call the stamp is REFUSED the way npm
+ * refuses a floor the registry does not serve yet — `code ETARGET` + `notarget No matching version
+ * found for <name>@<range>` on stderr, exit 1, the lock untouched.
  */
-function stubNpm(root, { version = '10.9.8', stampOn = 1, stampTo = '2.0.0' } = {}) {
+function stubNpm(root, { version = '10.9.8', stampOn = 1, stampTo = '2.0.0', refuse = '' } = {}) {
   const dir = path.join(root, '.stub');
   fs.mkdirSync(dir, { recursive: true });
   const log = path.join(dir, 'calls.log');
@@ -116,7 +119,9 @@ fs.writeFileSync(f, JSON.stringify(l,null,2)+'\\n');\n`
     `#!/bin/sh
 case "$1" in
   --version) echo "$STUB_NPM_VERSION" ;;
-  i) echo "$PWD" >> "$STUB_LOG"; n=$(wc -l < "$STUB_LOG" | tr -d ' '); if [ "$n" -ge "$STUB_STAMP_ON" ]; then node "$STUB_DIR/stamp.js"; fi ;;
+  i) echo "$PWD" >> "$STUB_LOG"; n=$(wc -l < "$STUB_LOG" | tr -d ' ')
+     if [ "$n" -ge "$STUB_STAMP_ON" ]; then node "$STUB_DIR/stamp.js"
+     elif [ -n "$STUB_REFUSE" ]; then echo "npm error code ETARGET" >&2; echo "npm error notarget No matching version found for $STUB_REFUSE." >&2; exit 1; fi ;;
   *) exec npm "$@" ;;
 esac
 `
@@ -128,9 +133,16 @@ esac
     STUB_LOG: log,
     STUB_STAMP_ON: String(stampOn),
     STUB_STAMP_TO: stampTo,
+    STUB_REFUSE: refuse,
     STUB_DIR: dir,
   };
   return { bin, env, calls: () => fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) };
+}
+
+/** A fake clock: `now` reads it, `sleep` advances it — the retry's arithmetic exact, no real seconds spent. */
+function clock() {
+  let t = 1000;
+  return { now: () => t, sleep: (ms) => (t += ms), elapsed: () => t - 1000 };
 }
 
 const quiet = () => {};
@@ -198,15 +210,17 @@ test("the trees: lerna's packages/** finds every dir with a package.json below p
 test('--restamp: only the torn tree is stamped, the registry serving the publish on the second round — green, stamped names packages/a, rounds 2, the root untouched', () => {
   const root = repo({ declared: '^2.0.0', installed: '1.0.0' });
   const stub = stubNpm(root, { version: '10.9.8', stampOn: 2, stampTo: '2.0.0' });
+  const c = clock();
   const floors = new LockFloors({
     repoRoot: root,
     npmBin: stub.bin,
     ciNpmMajor: 10,
     env: stub.env,
     log: quiet,
-    sleep: () => {},
+    sleep: c.sleep,
+    now: c.now,
   });
-  const result = floors.restamp({ attempts: 3, waitMs: 0 });
+  const result = floors.restamp({ budgetMs: 60000, waitMs: 20000 });
   assert.equal(result.ok, true);
   assert.deepEqual(result.stamped, ['packages/a']);
   assert.equal(result.rounds, 2);
@@ -220,23 +234,73 @@ test('--restamp: only the torn tree is stamped, the registry serving the publish
   assert.match(LockFloors.report(result), /stamped packages\/a \(2 rounds\)/);
 });
 
-test('--restamp: a registry that never serves the publish — the rounds run out, still torn, exit 1, nothing pretended', () => {
+test('--restamp: a registry that never serves the publish — the clock runs out (60 s at 20 s: rounds at 0, 20, 40 and a last one at 60), still torn, exit 1, nothing pretended', () => {
   const root = repo({ declared: '^2.0.0', installed: '1.0.0' });
   const stub = stubNpm(root, { version: '10.9.8', stampOn: 99 });
+  const c = clock();
   const floors = new LockFloors({
     repoRoot: root,
     npmBin: stub.bin,
     ciNpmMajor: 10,
     env: stub.env,
     log: quiet,
-    sleep: () => {},
+    sleep: c.sleep,
+    now: c.now,
   });
-  const result = floors.restamp({ attempts: 3, waitMs: 0 });
+  const result = floors.restamp({ budgetMs: 60000, waitMs: 20000 });
   assert.equal(result.ok, false);
-  assert.equal(result.rounds, 3);
-  assert.equal(stub.calls().length, 3);
+  assert.equal(result.rounds, 4);
+  assert.equal(stub.calls().length, 4);
+  assert.equal(c.elapsed(), 60000, 'rounds at 0, 20, 40 and 60 s: the last at the deadline, none past it');
   assert.equal(readLock(root, 'packages/a').packages[`node_modules/${DEP}`].version, '1.0.0');
-  assert.equal(floors.run({ restamp: true, attempts: 3, waitMs: 0 }), EXIT.TORN);
+  assert.equal(floors.run({ restamp: true, budgetMs: 60000, waitMs: 20000 }), EXIT.TORN);
+});
+
+test('--restamp: the registry refuses the first stamp (ETARGET: the publish not served yet) and serves on the second — the refusal is retried on the clock, never thrown: stamped, green, exit 0; a registry refusing until the clock runs out: still torn, exit 1, the report naming the floor it never served', () => {
+  const root = repo({ declared: '^2.0.0', installed: '1.0.0' });
+  const stub = stubNpm(root, { version: '10.9.8', stampOn: 2, stampTo: '2.0.0', refuse: `${DEP}@^2.0.0` });
+  const c = clock();
+  const floors = new LockFloors({
+    repoRoot: root,
+    npmBin: stub.bin,
+    ciNpmMajor: 10,
+    env: stub.env,
+    log: quiet,
+    sleep: c.sleep,
+    now: c.now,
+  });
+  const result = floors.restamp({ budgetMs: 300000, waitMs: 20000 });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.stamped, ['packages/a']);
+  assert.equal(result.rounds, 2);
+  assert.equal(stub.calls().length, 2, 'the refused stamp, then the one the registry served');
+  assert.equal(c.elapsed(), 20000, 'one wait between the two rounds');
+  assert.equal(readLock(root, 'packages/a').packages[`node_modules/${DEP}`].version, '2.0.0');
+  assert.equal(new LockFloors({ repoRoot: root, log: quiet }).check().ok, true, 'the real npm agrees afterwards');
+
+  const never = repo({ declared: '^2.0.0', installed: '1.0.0' });
+  const late = stubNpm(never, { version: '10.9.8', stampOn: 99, refuse: `${DEP}@^2.0.0` });
+  const c2 = clock();
+  const f2 = new LockFloors({
+    repoRoot: never,
+    npmBin: late.bin,
+    ciNpmMajor: 10,
+    env: late.env,
+    log: quiet,
+    sleep: c2.sleep,
+    now: c2.now,
+  });
+  const r2 = f2.restamp({ budgetMs: 60000, waitMs: 20000 });
+  assert.equal(r2.ok, false);
+  assert.equal(r2.rounds, 4, 'rounds at 0, 20, 40 and 60 s on the clock: the last at the deadline, none past it');
+  assert.equal(late.calls().length, 4);
+  assert.equal(c2.elapsed(), 60000, 'three waits; the clock never slept past its bound');
+  assert.equal(readLock(never, 'packages/a').packages[`node_modules/${DEP}`].version, '1.0.0', 'nothing pretended');
+  const report = LockFloors.report(r2);
+  assert.match(report, /TORN {2}packages\/a — @proteinjs\/fixture-common \^2\.0\.0 \(lock installs 1\.0\.0\)/);
+  assert.match(report, /last stamp: code ETARGET/);
+  assert.match(report, /last stamp: notarget No matching version found for @proteinjs\/fixture-common@\^2\.0\.0/);
+  assert.equal(f2.run({ restamp: true, budgetMs: 60000, waitMs: 20000 }), EXIT.TORN);
 });
 
 test('--restamp under the wrong npm major is refused before any stamp (64): lock stamps are npm-major dependent; the guard itself does not care', () => {
@@ -250,9 +314,9 @@ test('--restamp under the wrong npm major is refused before any stamp (64): lock
     log: quiet,
     sleep: () => {},
   });
-  assert.throws(() => floors.restamp({ waitMs: 0 }), NpmMajorMismatch);
+  assert.throws(() => floors.restamp({ budgetMs: 0, waitMs: 0 }), NpmMajorMismatch);
   assert.equal(stub.calls().length, 0, 'no stamp ran');
-  assert.equal(floors.run({ restamp: true, waitMs: 0 }), EXIT.NPM_MAJOR);
+  assert.equal(floors.run({ restamp: true, budgetMs: 0, waitMs: 0 }), EXIT.NPM_MAJOR);
   assert.equal(floors.check().ok, false, 'the guard still judges under any npm');
 });
 
@@ -262,7 +326,7 @@ test("the publish workflow alone (no reusable build/test workflow): after packag
   assert.equal(readLock(root, 'packages/server').packages[`node_modules/${DEP}`].version, '1.0.0', 'torn before');
   const stub = stubNpm(root, { version: '10.9.8', stampOn: 1, stampTo: '2.0.0' });
   const floors = new LockFloors({ repoRoot: root, npmBin: stub.bin, env: stub.env, log: quiet, sleep: () => {} });
-  assert.equal(floors.run({ restamp: true, attempts: 1, waitMs: 0 }), EXIT.OK);
+  assert.equal(floors.run({ restamp: true, budgetMs: 0, waitMs: 0 }), EXIT.OK);
   assert.deepEqual(
     stub.calls(),
     [path.join(root, 'packages/server')],

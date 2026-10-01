@@ -117,16 +117,23 @@ jobs:
         # the packument a resolver reads lags it (a stamp asked before it serves fails with ETARGET
         # and the step leaves the tear — proteinjs/db run 36295867264, server 36075669002, user
         # 36083990691), so MintServed.js polls `npm view <name>@<version> version` for every tag
-        # this run's `lerna publish` made (the tags at HEAD), 10 s apart on one 5-minute clock, one
-        # "served after N s" line per package; a package still not served is a WARNING line and exit
-        # 1, and the re-stamp still tries (`|| [ $? -eq 1 ]`: only a timeout goes on; git or npm
-        # unrunnable stops here). Then LockFloors.js --restamp resolves the torn trees only (`npm i
-        # --package-lock-only` with this job's npm 10 — lock stamps are npm-major dependent), proves
-        # every tree coherent, and the locks ride main as the mint's second commit; a mint that
-        # moved no consumer floor commits nothing. Best-effort by design (continue-on-error): the
-        # packages are published, so a registry still not serving the mint leaves main as lerna left
-        # it, this step red, the job green; `node .github/scripts/LockFloors.js --restamp` under npm
-        # 10, committed, is the hand recipe.
+        # this run's `lerna publish` made (the tags at HEAD), 10 s apart on one 15-minute clock
+        # (proteinjs/db run 36818699801: a ten-package publish had its last package served about
+        # 450 s after the accept, past the 5-minute clock this step first shipped with — the lag
+        # grows with the publish), one "served after N s" line per package; a package still not
+        # served is a WARNING line and exit 1, and the re-stamp still tries (`|| [ $? -eq 1 ]`: only
+        # a timeout goes on; git or npm unrunnable stops here). Then LockFloors.js --restamp resolves
+        # the torn trees only (`npm i --package-lock-only` with this job's npm 10 — lock stamps are
+        # npm-major dependent), retrying a stamp the registry refuses (ETARGET / E404) 20 s apart on
+        # its own 5-minute clock before reporting the tree torn — so a package served a minute after
+        # the wait expired still lands — proves every tree coherent, and the locks ride main as the
+        # mint's second commit; a mint that moved no consumer floor commits nothing. Best-effort by
+        # design (continue-on-error): the packages are published, so a registry still not serving
+        # the mint past both clocks leaves main as lerna left it, this step red naming the floor it
+        # never served, the job green; `node .github/scripts/LockFloors.js --restamp` under npm 10,
+        # committed, is the hand recipe. This job sets no timeout-minutes: GitHub's default bound
+        # (360 minutes) holds the 15-minute wait and the 5-minute retry clock beside the install,
+        # build and test steps above.
         if: steps.tip.outputs.is_tip == 'true'
         continue-on-error: true
         run: |
