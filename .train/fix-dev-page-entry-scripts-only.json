@@ -1,0 +1,11 @@
+{
+  "branch": "fix/dev-page-entry-scripts-only",
+  "packages": ["server"],
+  "suites": [
+    "packages/server/test/reactAppHotUpdate.test.ts",
+    "packages/server/test/reactAppBoot.test.ts",
+    "packages/server/test/reactAppHeadTags.test.ts",
+    "packages/server/test/htmlCacheControl.test.ts"
+  ],
+  "removes": []
+}
