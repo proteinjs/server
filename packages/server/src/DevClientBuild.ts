@@ -21,7 +21,26 @@ export type DevClientBuildInfo = {
   assets: string[];
 };
 
+/** A completed compile's stats as the record reads them: `stats.toJson(DevClientBuild.STATS_OPTIONS)`. */
+export type DevClientBuildStats = {
+  hash: string;
+  time?: number;
+  errors?: unknown[];
+  /** Each entrypoint's files in the compile's own load order (webpack 4 named them as strings). */
+  entrypoints?: Record<string, { assets?: (string | { name: string })[] }>;
+};
+
 export class DevClientBuild {
+  /** What the compile's `done` hook asks `stats.toJson` for — only the fields a record reads. */
+  static readonly STATS_OPTIONS = {
+    all: false,
+    hash: true,
+    timings: true,
+    errors: true,
+    entrypoints: true,
+    chunkGroupAssets: true,
+  } as const;
+
   private static current: DevClientBuildInfo | undefined;
 
   static record(info: DevClientBuildInfo): void {
@@ -30,5 +49,28 @@ export class DevClientBuild {
 
   static get(): DevClientBuildInfo | undefined {
     return this.current;
+  }
+
+  /** The record of one completed compile, from its stats. */
+  static fromStats(stats: DevClientBuildStats): DevClientBuildInfo {
+    return {
+      hash: stats.hash,
+      builtAt: new Date().toISOString(),
+      durationMs: stats.time,
+      errorCount: stats.errors?.length ?? 0,
+      assets: this.entrypointScripts(stats),
+    };
+  }
+
+  /**
+   * The entrypoints' script files in the compile's own load order — what the dev page's bundle
+   * tags render (reactApp.ts). Source maps are not scripts.
+   */
+  private static entrypointScripts(stats: DevClientBuildStats): string[] {
+    return Object.values(stats.entrypoints ?? {}).flatMap((entrypoint) =>
+      (entrypoint.assets ?? [])
+        .map((asset) => (typeof asset === 'string' ? asset : asset.name))
+        .filter((name) => name.endsWith('.js'))
+    );
   }
 }

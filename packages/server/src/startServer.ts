@@ -151,27 +151,13 @@ function initializeHotReloading(app: express.Express, config: ServerConfig): Pro
   // Every completed compile is recorded (for the `?v=<hash>` script-tag stamp + /dev/build-info)
   // and logged, so "which build is this page running?" is answerable instead of guessable.
   compiler.hooks.done.tap('proteinjs-server', (stats: any) => {
-    const { hash, time, errors, entrypoints } = stats.toJson({
-      all: false,
-      hash: true,
-      timings: true,
-      errors: true,
-      entrypoints: true,
-      chunkGroupAssets: true,
-    });
-    const errorCount = errors?.length ?? 0;
-    // The entrypoint's script files in the compile's own load order — what the dev page's bundle
-    // tags render (reactApp.ts). Source maps and hot-update chunks are not entrypoint files.
-    const assets: string[] = Object.values(entrypoints ?? {}).flatMap((entrypoint: any) =>
-      (entrypoint.assets ?? [])
-        .map((asset: any) => (typeof asset === 'string' ? asset : asset.name))
-        .filter((name: string) => name.endsWith('.js'))
-    );
-    DevClientBuild.record({ hash, builtAt: new Date().toISOString(), durationMs: time, errorCount, assets });
+    const build = DevClientBuild.fromStats(stats.toJson(DevClientBuild.STATS_OPTIONS));
+    DevClientBuild.record(build);
+    const { hash, durationMs, errorCount } = build;
     if (errorCount > 0) {
-      logger.error({ message: `Client bundle compiled WITH ERRORS`, obj: { hash, durationMs: time, errorCount } });
+      logger.error({ message: `Client bundle compiled WITH ERRORS`, obj: { hash, durationMs, errorCount } });
     } else {
-      logger.info({ message: `Client bundle compiled`, obj: { hash, durationMs: time } });
+      logger.info({ message: `Client bundle compiled`, obj: { hash, durationMs } });
     }
   });
 
