@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.10.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.10.0...@proteinjs/server@3.10.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* **server:** the dev page injects only the entrypoints' scripts, never a hot-update chunk ([906952f](https://github.com/proteinjs/server/commit/906952f9d608ac5d553832d74778c1fa08591e64))
+
+
+
+
+
 # [3.10.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.9.0...@proteinjs/server@3.10.0) (2026-09-29)
 
 
