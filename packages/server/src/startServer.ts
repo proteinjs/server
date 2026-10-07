@@ -50,6 +50,20 @@ export async function startServer(config: ServerConfig) {
   // First, before any (possibly long) startup work: a SIGTERM must drain gracefully from the
   // moment this process can be part of a rollout, including mid-boot.
   GracefulShutdown.install(server, config);
+  // The boot is awaited HERE, and a rejection anywhere in it ends the process (the boot boundary:
+  // the error through the logger on one line, exit 1, nothing listening) — never left to the
+  // consumer's bare `startServer(config)` call, whose unhandled rejection Node's
+  // --unhandled-rejections mode decides: fatal by default, a warning under a dev supervisor's
+  // `warn`, where a server whose schema sync failed idled with no listener and no exit.
+  try {
+    await boot(config);
+  } catch (error) {
+    GracefulShutdown.exitOnBootFailure(error);
+  }
+}
+
+/** The boot, phase by phase: the startup tasks, the request pipeline, the listener. A rejection anywhere is a failed boot. */
+async function boot(config: ServerConfig) {
   await runStartupTasks('before server config');
   const routes = getRoutes();
   configureRequests(app, routes);

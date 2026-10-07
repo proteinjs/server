@@ -54,7 +54,7 @@
 const { inspect } = require('util');
 const expressSession = require('express-session');
 const passport = require('passport');
-const { SourceRepository } = require('@proteinjs/reflection');
+const { registerSourceObject } = require('./registerSourceObject');
 const { RawBody, Session } = require('@proteinjs/server-api');
 const { Logger, DevLogWriter } = require('@proteinjs/logger');
 const { startServer, GracefulShutdown, Request, SocketIOServerRepo } = require('../../dist/generated/index.js');
@@ -64,46 +64,8 @@ if (!port) {
   throw new Error('FIXTURE_PORT is required');
 }
 
-/**
- * A source-graph registration the way the built dist registers its own (dist/generated/index.js: a
- * node typed `typeQualifiedName` + the link to the object, keyed by the qualified name
- * `<package>/<name>`): routes and the default log writer are found by reflection.
- */
-function register(typeQualifiedName, name, object) {
-  const slash = typeQualifiedName.lastIndexOf('/');
-  const type = {
-    packageName: typeQualifiedName.slice(0, slash),
-    name: typeQualifiedName.slice(slash + 1),
-    filePath: null,
-    qualifiedName: typeQualifiedName,
-    typeParameters: [],
-    directParents: null,
-  };
-  const qualifiedName = `@proteinjs/server/${name}`;
-  SourceRepository.merge(
-    JSON.stringify({
-      options: { directed: true, multigraph: false, compound: false },
-      nodes: [
-        {
-          v: qualifiedName,
-          value: {
-            packageName: '@proteinjs/server',
-            name,
-            filePath: __filename,
-            qualifiedName,
-            type: { ...type, directParents: [type] },
-            isExported: true,
-            isConst: true,
-            sourceType: 0,
-          },
-        },
-        { v: type.qualifiedName },
-      ],
-      edges: [{ v: qualifiedName, w: type.qualifiedName, value: 'has type' }],
-    }),
-    { [qualifiedName]: object }
-  );
-}
+/** The source-graph registration the fixtures share (registerSourceObject.js): routes and the log writer are found by reflection. */
+const register = registerSourceObject;
 
 /**
  * A ROUTED slow endpoint: `GET /slow-route?ms=` holds for ?ms= inside a Route the server dispatches

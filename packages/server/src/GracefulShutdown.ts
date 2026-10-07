@@ -48,6 +48,12 @@ export type HoldObserver = { acquired?: (label: string) => void; released?: (lab
  *     to withhold a cause whose words can quote record values (a backend refusal naming the
  *     colliding key). The logger renders the error through `util.inspect` with hooks honored (or
  *     the consumer's log writer), so what the error withholds stays withheld on the way out.
+ *   A boot that FAILS (a startup task rejects — a schema sync the database refused — or a config
+ *     step throws) → `startServer` awaits the boot and lands here (`exitOnBootFailure`): the error
+ *     through the logger on one line, exit 1 at once, nothing listening (the listener opens only
+ *     after every step ahead of it resolved). Whatever Node's --unhandled-rejections mode: under
+ *     `warn` (a dev supervisor's launch) a consumer's bare `startServer(config)` call would
+ *     otherwise leave the rejection as a warning and the process idling, no listener and no exit.
  *   exit 86 → NOT this class's concern: `process.exit(86)` is the ServePackageSupervisor
  *     restart-request contract (a liveness monitor giving up on a dependency); it is not
  *     signal-driven and is untouched by these handlers.
@@ -136,6 +142,22 @@ export class GracefulShutdown {
     return release;
   }
 
+  /**
+   * The boot's failure boundary (`startServer` awaits the boot and lands here on a rejection): the
+   * error's own first line beside the message, the error through the logger (its inspect hook
+   * honored, as the fatal-error boundary prints), then exit 1 — no drain, nothing listens.
+   */
+  static exitOnBootFailure(error: unknown): never {
+    if (GracefulShutdown.instance) {
+      GracefulShutdown.instance.shuttingDown = true;
+    }
+    GracefulShutdown.staticLogger.error({
+      message: `Boot failed — exiting 1: ${GracefulShutdown.firstLine(error)}`,
+      error,
+    });
+    process.exit(1);
+  }
+
   /** Every hold outstanding right now, in acquisition order. */
   static outstandingHolds(): Hold[] {
     return Array.from(GracefulShutdown.holds.values()).map((entry) => ({ ...entry.hold }));
@@ -213,6 +235,12 @@ export class GracefulShutdown {
         .join(', ')}`,
       obj: { holds: abandoned },
     });
+  }
+
+  /** An error's own first line — its message's, never the stack's. */
+  private static firstLine(error: unknown): string {
+    const text = error instanceof Error ? error.message : String(error);
+    return text.split('\n')[0];
   }
 
   private exitNow(): void {
