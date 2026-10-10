@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.6.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.5.0...@proteinjs/server-api@3.6.0) (2026-10-10)
+
+
+### Features
+
+* **server:** a declared bundles URL — the page names its bundles there in CORS mode and the server redirects its own bundles path to it ([2ea9eb2](https://github.com/brentbahry/server/commit/2ea9eb2164ce71ba9802e6c0c9803927617ff444))
+
+
+
+
+
 # [3.5.0](https://github.com/brentbahry/server/compare/@proteinjs/server-api@3.4.0...@proteinjs/server-api@3.5.0) (2026-09-29)
 
 
