@@ -1,0 +1,1 @@
+{ "branch": "feat/bundles-url", "packages": ["api", "server"], "suites": ["packages/server/test/bundlesUrl.test.ts", "packages/server/test/reactAppBundlesUrl.test.ts", "packages/server/test/bundlesRedirect.test.ts", "packages/server/test/reactAppBoot.test.ts", "packages/server/test/htmlCacheControl.test.ts", "packages/server/test/reactAppHeadTags.test.ts"], "removes": [] }

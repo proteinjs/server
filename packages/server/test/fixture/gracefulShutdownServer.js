@@ -354,8 +354,17 @@ startServer({
   },
   // A bundle pointer so the '*' react-app route serves its HTML — the html-cache-control
   // suite asserts response headers on the page the app actually ships. No staticContentDir:
-  // nothing needs the bundle to resolve, only the page response to render.
-  staticContent: { bundlePaths: ['bundles/app.test.js'] },
+  // nothing needs the bundle to resolve, only the page response to render. With
+  // FIXTURE_STATIC_DIR set, the served shape instead: a static dir with a bundles dir under it
+  // (the page lists the bundles from there) and, with FIXTURE_BUNDLES_URL, the declared place
+  // the bundles are served from — the bundles-redirect suite's two roads.
+  staticContent: process.env.FIXTURE_STATIC_DIR
+    ? {
+        staticContentDir: process.env.FIXTURE_STATIC_DIR,
+        bundlesDir: 'bundles',
+        bundlesUrl: process.env.FIXTURE_BUNDLES_URL || undefined,
+      }
+    : { bundlePaths: ['bundles/app.test.js'] },
   shutdown: {
     drainDelayMs: process.env.FIXTURE_DRAIN_DELAY_MS ? Number(process.env.FIXTURE_DRAIN_DELAY_MS) : undefined,
     drainTimeoutMs: process.env.FIXTURE_DRAIN_TIMEOUT_MS ? Number(process.env.FIXTURE_DRAIN_TIMEOUT_MS) : undefined,

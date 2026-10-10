@@ -17,6 +17,7 @@ import {
   getStartupTasks,
 } from '@proteinjs/server-api';
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
+import { BundlesUrl } from './BundlesUrl';
 import { RequestBodyParsers } from './RequestBodyParsers';
 import { Logger } from '@proteinjs/logger';
 import { RequestDigests } from '@proteinjs/util-node';
@@ -275,6 +276,19 @@ function configureHttps(app: express.Express) {
 function configureStaticContentRouter(app: express.Express, config: ServerConfig) {
   if (!config.staticContent?.staticContentDir) {
     return;
+  }
+
+  // The bundles are served from a declared place (ServerConfig.staticContent.bundlesUrl): this
+  // process answers its own bundles path with a permanent redirect there, registered ahead of the
+  // static router so the files under the bundles dir — the release's own listing — are never served
+  // from here. A page served before the bundles moved, or a stale copy of one, still reaches them.
+  const bundlesUrl = BundlesUrl.declared(config);
+  if (bundlesUrl && config.staticContent.bundlesDir) {
+    const bundlesPath = path.posix.join(staticContentPath, config.staticContent.bundlesDir);
+    app.use(bundlesPath, (request: express.Request, response: express.Response) => {
+      response.redirect(308, bundlesUrl.urlFor(request.path));
+    });
+    logger.info({ message: `Bundles under ${bundlesPath} are served from ${bundlesUrl}; answering with a redirect` });
   }
 
   app.use(staticContentPath, express.static(config.staticContent.staticContentDir, config.staticContent.staticOptions));

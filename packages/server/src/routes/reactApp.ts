@@ -3,6 +3,7 @@ import express from 'express';
 import ReactHelmet from 'react-helmet';
 import { ServerConfig, getServerRenderedHeadTags, getServerRenderedScripts } from '@proteinjs/server-api';
 import { Fs } from '@proteinjs/util-node';
+import { BundlesUrl } from '../BundlesUrl';
 import { DevClientBuild } from '../DevClientBuild';
 
 // Browser-chrome ground colors: the light and dark `background.default` of the consumer
@@ -12,6 +13,9 @@ const THEME_COLOR_LIGHT = '#FFFFFF';
 const THEME_COLOR_DARK = '#202020';
 
 export const createReactApp = (serverConfig: ServerConfig) => {
+  // The declared place the bundles are served from, read once: a malformed declaration refuses the
+  // boot here instead of shipping a page that names it.
+  const bundlesUrl = BundlesUrl.declared(serverConfig);
   return {
     path: '*',
     method: 'get' as 'get',
@@ -31,9 +35,13 @@ export const createReactApp = (serverConfig: ServerConfig) => {
       // of the page).
       const [serverRenderedScripts, bundleUrls, headTags] = await Promise.all([
         serverRenderedScriptTags(),
-        bundleScriptUrls(serverConfig),
+        bundleScriptUrls(serverConfig, bundlesUrl),
         serverRenderedHeadTags(request),
       ]);
+      // A bundle served from another place loads in CORS mode: without `crossorigin` a browser
+      // reports an error thrown inside a cross-origin classic script as the opaque "Script error."
+      // The preload carries the same mode, or the browser fetches the bundle twice.
+      const crossOrigin = bundlesUrl !== undefined;
       // The page must ALWAYS revalidate (found live 2026-09-01, the mobile-app stale-page
       // investigation): without an explicit policy, HTTP heuristic caching applies (RFC 9111
       // §4.2.2) — WKWebView in particular can serve the cached page without revalidating,
@@ -49,7 +57,7 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                         <meta name='theme-color' content='${THEME_COLOR_LIGHT}' media='(prefers-color-scheme: light)'>
                         <meta name='theme-color' content='${THEME_COLOR_DARK}' media='(prefers-color-scheme: dark)'>
                         <link href='${serverConfig.staticContent?.faviconPath ? path.join('/static/', serverConfig.staticContent.faviconPath) : ''}' rel='icon' type='image/png' />
-                        ${bundlePreloadTags(bundleUrls)}
+                        ${bundlePreloadTags(bundleUrls, crossOrigin)}
                         ${helmet.title.toString()}
                         ${helmet.meta.toString()}
                         ${helmet.link.toString()}
@@ -59,7 +67,7 @@ export const createReactApp = (serverConfig: ServerConfig) => {
                         <div id='app'></div>
                         <script>proteinjs = {};</script>
                         ${serverRenderedScripts}
-                        ${bundleScriptTags(bundleUrls)}
+                        ${bundleScriptTags(bundleUrls, crossOrigin)}
                     </body>
                 </html>`);
     },
@@ -71,9 +79,10 @@ export const createReactApp = (serverConfig: ServerConfig) => {
  * recorded them (DevClientBuild — the page follows the chunk graph the webpack config declares),
  * each stamped `?v=<hash>` so the page is verifiable against /dev/build-info (matching hash =
  * provably running the current build). Prod: the configured bundle paths, or every `.js` under the
- * bundles dir in a stable (sorted) order — webpack's runtime registers chunks in any order.
+ * bundles dir in a stable (sorted) order — webpack's runtime registers chunks in any order — each
+ * at the declared bundles URL when there is one, else under this server's `/static/`.
  */
-async function bundleScriptUrls(serverConfig: ServerConfig): Promise<string[]> {
+async function bundleScriptUrls(serverConfig: ServerConfig, bundlesUrl: BundlesUrl | undefined): Promise<string[]> {
   if (!(serverConfig.staticContent?.bundlePaths || serverConfig.staticContent?.bundlesDir)) {
     return [];
   }
@@ -96,7 +105,13 @@ async function bundleScriptUrls(serverConfig: ServerConfig): Promise<string[]> {
     const staticContentDir = serverConfig.staticContent.staticContentDir;
     const resolvedBundlesDir = path.join(staticContentDir, serverConfig.staticContent.bundlesDir);
     const filePaths = await Fs.getFilePathsMatchingGlob(resolvedBundlesDir, '**/*.js');
-    return filePaths.map((filePath) => path.join('/static/', path.relative(staticContentDir, filePath))).sort();
+    return filePaths
+      .map((filePath) =>
+        bundlesUrl
+          ? bundlesUrl.urlFor(path.relative(resolvedBundlesDir, filePath))
+          : path.join('/static/', path.relative(staticContentDir, filePath))
+      )
+      .sort();
   }
 
   return [];
@@ -109,13 +124,20 @@ async function bundleScriptUrls(serverConfig: ServerConfig): Promise<string[]> {
  * document's first paint. The inline server-rendered scripts above them still run at parse time,
  * so `proteinjs[...]` globals exist before any bundle executes.
  */
-function bundleScriptTags(bundleUrls: string[]): string {
-  return bundleUrls.map((url) => `<script defer src='${url}'></script>`).join('\n');
+function bundleScriptTags(bundleUrls: string[], crossOrigin: boolean): string {
+  return bundleUrls.map((url) => `<script defer src='${url}'${crossOriginAttribute(crossOrigin)}></script>`).join('\n');
 }
 
 /** `<link rel=preload>` in the head: the fetches start from the first bytes of the document. */
-function bundlePreloadTags(bundleUrls: string[]): string {
-  return bundleUrls.map((url) => `<link rel='preload' href='${url}' as='script'>`).join('\n');
+function bundlePreloadTags(bundleUrls: string[], crossOrigin: boolean): string {
+  return bundleUrls
+    .map((url) => `<link rel='preload' href='${url}' as='script'${crossOriginAttribute(crossOrigin)}>`)
+    .join('\n');
+}
+
+/** CORS mode on a tag — anonymous (no credentials: the bundles are the same for everyone). */
+function crossOriginAttribute(crossOrigin: boolean): string {
+  return crossOrigin ? " crossorigin='anonymous'" : '';
 }
 
 /** Every server-rendered script rendered CONCURRENTLY; emitted in registration order. */

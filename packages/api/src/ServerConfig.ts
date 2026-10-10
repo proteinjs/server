@@ -21,6 +21,22 @@ export interface ServerConfig {
     bundlePaths?: string[];
     /** Dir containing bundles; relative from `staticContentDir`. */
     bundlesDir?: string;
+    /**
+     * Where the files under `bundlesDir` are served from when it is not this process: an
+     * absolute http(s) URL with no query or fragment (a trailing slash is ignored). The page
+     * still lists the bundles the release carries under `bundlesDir`, but names each one as
+     * `<bundlesUrl>/<path under bundlesDir>` — `https://assets.example.com/bundles` +
+     * `app.1a2b3c.js` → `https://assets.example.com/bundles/app.1a2b3c.js` — and loads it in CORS
+     * mode (`crossorigin`), so the browser reports an error thrown inside a bundle in full; the
+     * place must answer such a load with `Access-Control-Allow-Origin`. The server answers its own
+     * `/static/<bundlesDir>/…` with a permanent redirect to the same place, so a page served
+     * before the move, or a stale copy of one, still reaches its bundles. The usual seat: a
+     * deployment that publishes every release's content-hashed bundles to a store behind a CDN
+     * before it rolls out, so a page of any release finds its chunks whichever process serves
+     * it. Unset: the bundles are served from `staticContentDir` by this process. Ignored in
+     * development, where the in-process build serves them. A malformed value refuses the boot.
+     */
+    bundlesUrl?: string;
     /** Relative from `staticContentDir` */
     faviconPath?: string;
     /** Used for hot reloading of bundle assets */
