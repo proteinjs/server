@@ -17,6 +17,14 @@ import { RedactedUrl } from './RedactedUrl';
 const logger = new Logger({ name: 'Server' });
 let requestCounter: number = 0;
 
+/**
+ * The response header carrying the request's id — the id this process minted for it, the one its
+ * own log lines carry (the Started/Finished pair and every line a log writer attaches the request's
+ * metadata to). Echoed so that what a load balancer logs about the request, this process's lines
+ * and a route's own lines (a service method's, which reads it off the response) join on one id.
+ */
+export const REQUEST_ID_HEADER = 'X-Request-Id';
+
 export function loadRoutes(routes: Route[], server: express.Express, config: ServerConfig) {
   let starRoute: Route | null = null;
   const wildcardRoutes: Route[] = [];
@@ -78,6 +86,8 @@ function wrapRoute(
   ) {
     const requestNumber = ++requestCounter;
     const requestId = crypto.randomBytes(8).toString('hex');
+    response.setHeader(REQUEST_ID_HEADER, requestId);
+    const startedAt = Date.now();
     // Every line below — and every line a log writer attaches the metadata to — prints this form:
     // the path and the query's keys, never a query value (a reset or invite link's credential) and
     // never a fragment's content.
@@ -135,7 +145,9 @@ function wrapRoute(
       if (process.env.DEVELOPMENT) {
         message = `[#${requestNumber}] ${message}`;
       }
-      logger.info({ message });
+      // The request's whole time on this process and the status it answered — what the load
+      // balancer's latency and the route's own duration are read against, by the request id.
+      logger.info({ message, obj: { durationMs: Date.now() - startedAt, status: response.statusCode } });
     }
 
     next();

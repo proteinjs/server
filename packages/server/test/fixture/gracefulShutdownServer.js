@@ -33,6 +33,7 @@
  *                            in front of the routes, before the request has metadata of its own
  *   REQUEST_ID <path> <fresh | repeat> — after a routed request, whether its metadata's id is one no
  *                            earlier request's read carried (repeat = another request's id)
+ *   REQUEST_METADATA_ID <path> <id> — the id itself: what the response's X-Request-Id header echoes
  *   SESSION_OWN <path> <yes | no | none> — after a routed request, whether the session data a log
  *                            writer reads is that request's own session (express's sessionID)
  *
@@ -139,6 +140,55 @@ register('@proteinjs/server-api/Route', 'parsedBodyRoute', {
   path: '/parsed-body-route',
   method: 'post',
   onRequest: echoBodies,
+});
+
+/**
+ * The compression suite's routes. `GET /big-body-route?bytes=` answers a document-shaped JSON body
+ * of at least ?bytes= composed in full (one `send` — its length known when the headers go out);
+ * `GET /streamed-route` writes its body in three pieces over time with no length declared, the shape
+ * of a turn streamed as it is produced.
+ */
+const PARAGRAPH =
+  'The quick brown fox jumps over the lazy dog, then writes a note about it: “naïve”, résumé, ' +
+  'Ångström, a check ✓ and a globe 🌍 — with a "double quote", a backslash \\ and a\nline break. ';
+function documentBody(bytes) {
+  const rows = [];
+  const body = { id: 'document-root', title: 'A large document', version: 7, rows };
+  let size = JSON.stringify(body).length;
+  for (let i = 0; size < bytes; i++) {
+    const row = {
+      id: `row-${i}`,
+      index: i,
+      parent: i === 0 ? null : `row-${Math.floor((i - 1) / 3)}`,
+      text: PARAGRAPH.repeat(1 + (i % 7)),
+      tags: ['alpha', 'beta', `tag-${i % 11}`],
+      done: i % 2 === 0,
+    };
+    rows.push(row);
+    size += JSON.stringify(row).length + 1;
+  }
+  return body;
+}
+register('@proteinjs/server-api/Route', 'bigBodyRoute', {
+  path: '/big-body-route',
+  method: 'get',
+  onRequest: async (request, response) => {
+    response.type('application/json').send(JSON.stringify(documentBody(Number(request.query.bytes ?? 100000))));
+  },
+});
+register('@proteinjs/server-api/Route', 'streamedRoute', {
+  path: '/streamed-route',
+  method: 'get',
+  onRequest: (request, response) =>
+    new Promise((resolve) => {
+      response.setHeader('Content-Type', 'application/json');
+      response.write(JSON.stringify({ piece: 1, text: PARAGRAPH.repeat(8) }) + '\n');
+      setTimeout(() => response.write(JSON.stringify({ piece: 2, text: PARAGRAPH.repeat(8) }) + '\n'), 200);
+      setTimeout(() => {
+        response.end(JSON.stringify({ piece: 3, text: PARAGRAPH.repeat(8) }) + '\n');
+        resolve();
+      }, 400);
+    }),
 });
 
 /**
@@ -343,6 +393,8 @@ startServer({
         // The id: fresh when no earlier request's read carried it (a repeat is another request's).
         console.log(`REQUEST_ID ${request.path} ${requestIdsRead.has(metadata.id) ? 'repeat' : 'fresh'}`);
         requestIdsRead.add(metadata.id);
+        // The id itself, beside the path: what the response's X-Request-Id header must equal.
+        console.log(`REQUEST_METADATA_ID ${request.path} ${metadata.id}`);
       }
       // The session data a log writer reads: this request's own (express's sessionID) or not.
       const session = Session.getData();

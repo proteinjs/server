@@ -6,7 +6,8 @@ import { ChildProcess, spawn } from 'child_process';
 /**
  * The request log, on a real server process (spawns the built dist — run `npm run build` first).
  * `wrapRoute` writes a `Started <url>` / `Finished <url>` pair for every routed request unless
- * `shouldLogRequest` says otherwise.
+ * `shouldLogRequest` says otherwise; the Finished line carries the request's duration and status
+ * as its object, printed after the url — the url ends where the object opens.
  *
  * Its exclusions: the readiness route `/health-check` is polled continuously by whatever fronts the
  * process (a load balancer's health checker, a kubelet's readiness and liveness probes — every
@@ -77,15 +78,15 @@ describe('request logging exclusions', () => {
     // prod shape applies in front of the page routes.
     const page = await request(fixture.port, '/some-page', { 'X-Forwarded-Proto': 'https' });
     expect(page.status).toBe(200);
-    await fixture.waitForLine(/Finished \/some-page$/m);
+    await fixture.waitForLine(/Finished \/some-page \{/m);
 
     const log = fixture.stdout();
     expect(log).toMatch(/Started \/some-page$/m);
-    expect(log).toMatch(/Finished \/some-page$/m);
+    expect(log).toMatch(/Finished \/some-page \{/m);
     // Not one line for the readiness route — neither from the suite's probes above nor from the
     // boot's readiness polling in startFixture (the same route, the same shape).
     expect(log).not.toMatch(/Started \/health-check$/m);
-    expect(log).not.toMatch(/Finished \/health-check$/m);
+    expect(log).not.toMatch(/Finished \/health-check \{/m);
   }, 30000);
 
   it('the exclusion is exact: a path that merely begins with /health-check is logged like any other', async () => {
@@ -93,11 +94,11 @@ describe('request logging exclusions', () => {
 
     const page = await request(fixture.port, '/health-check-page', { 'X-Forwarded-Proto': 'https' });
     expect(page.status).toBe(200);
-    await fixture.waitForLine(/Finished \/health-check-page$/m);
+    await fixture.waitForLine(/Finished \/health-check-page \{/m);
 
     const log = fixture.stdout();
     expect(log).toMatch(/Started \/health-check-page$/m);
-    expect(log).toMatch(/Finished \/health-check-page$/m);
+    expect(log).toMatch(/Finished \/health-check-page \{/m);
     expect(log).not.toMatch(/Started \/health-check$/m);
   }, 30000);
 });
@@ -125,7 +126,7 @@ describe('the request log carries the query keys, never their values', () => {
 
     const lines = requestLines(fixture.stdout());
     expect(lines).toContainEqual(expect.stringMatching(/Started \/some-page\?token=<redacted>$/));
-    expect(lines).toContainEqual(expect.stringMatching(/Finished \/some-page\?token=<redacted>$/));
+    expect(lines).toContainEqual(expect.stringMatching(/Finished \/some-page\?token=<redacted> \{/));
     expect(lines.filter((line) => line.includes('abcd'))).toEqual([]);
   }, 30000);
 
@@ -148,7 +149,7 @@ describe('the request log carries the query keys, never their values', () => {
 
     const log = fixture.stdout();
     expect(log).toMatch(/Started \/some-page$/m);
-    expect(log).toMatch(/Finished \/some-page$/m);
+    expect(log).toMatch(/Finished \/some-page \{/m);
     expect(log).toMatch(/^REQUEST_METADATA_URL \/some-page$/m);
   }, 30000);
 
@@ -160,7 +161,7 @@ describe('the request log carries the query keys, never their values', () => {
 
     const log = fixture.stdout();
     expect(log).toMatch(/Started \/some-page\?id=<redacted>&invite=<redacted>$/m);
-    expect(log).toMatch(/Finished \/some-page\?id=<redacted>&invite=<redacted>$/m);
+    expect(log).toMatch(/Finished \/some-page\?id=<redacted>&invite=<redacted> \{/m);
     expect(log).toMatch(/^REQUEST_METADATA_URL \/some-page\?id=<redacted>&invite=<redacted>$/m);
     expect(log).not.toContain(thoughtId);
     expect(log).not.toContain('abcd');
@@ -189,7 +190,7 @@ describe('the request log carries the query keys, never their values', () => {
 
     const log = fixture.stdout();
     expect(log).toMatch(/Started \/some-page#<redacted>$/m);
-    expect(log).toMatch(/Finished \/some-page#<redacted>$/m);
+    expect(log).toMatch(/Finished \/some-page#<redacted> \{/m);
     expect(log).toMatch(/^REQUEST_METADATA_URL \/some-page#<redacted>$/m);
     expect(log).toMatch(/Started \/other-page\?id=<redacted>#<redacted>$/m);
     expect(log).toMatch(/^REQUEST_METADATA_URL \/other-page\?id=<redacted>#<redacted>$/m);

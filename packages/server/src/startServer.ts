@@ -19,6 +19,7 @@ import {
 import { loadRoutes, loadDefaultStarRoute } from './loadRoutes';
 import { BundlesUrl } from './BundlesUrl';
 import { RequestBodyParsers } from './RequestBodyParsers';
+import { ResponseCompression } from './ResponseCompression';
 import { Logger } from '@proteinjs/logger';
 import { RequestDigests } from '@proteinjs/util-node';
 import { SocketIOServerRepo, ExtendedSocket } from './SocketIOServerRepo';
@@ -114,6 +115,7 @@ async function runStartupTasks(when: StartupTask['when']) {
 }
 
 function configureRequests(app: express.Express, routes: Route[]) {
+  ResponseCompression.install(app);
   app.use(cookieParser());
   RequestBodyParsers.install(app, routes);
   app.disable('x-powered-by');
