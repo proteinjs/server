@@ -45,7 +45,7 @@ describe('the request id on the response', () => {
       /REQUEST_METADATA_ID \/some-page [0-9a-f]{16}\n(.*\n)*.*REQUEST_METADATA_ID \/some-page /m
     );
 
-    const ids = [...fixture.stdout().matchAll(/^REQUEST_METADATA_ID \/some-page ([0-9a-f]{16})$/gm)].map((m) => m[1]);
+    const ids = metadataIds(fixture.stdout(), '/some-page');
     expect(ids).toHaveLength(2);
     expect(first.headers['x-request-id']).toBe(ids[0]);
     expect(second.headers['x-request-id']).toBe(ids[1]);
@@ -59,8 +59,8 @@ describe('the request id on the response', () => {
     expect(page.status).toBe(200);
     await fixture.waitForLine(/Finished \/slow-route\?ms=<redacted>/m);
 
-    // The dev writer prints the message, then the line's object on the lines that follow it.
-    const log = fixture.stdout();
+    // The dev writer prints the message, then the line's object (in color: the escapes stripped here).
+    const log = fixture.stdout().replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '');
     const finished = log.indexOf('Finished /slow-route?ms=<redacted>');
     expect(finished).toBeGreaterThan(-1);
     const after = log.slice(finished, finished + 400);
@@ -70,6 +70,16 @@ describe('the request id on the response', () => {
     expect(after).toMatch(/status: 200/);
   }, 30000);
 });
+
+/** The ids the fixture printed off the request metadata for `requestPath`, in order. */
+function metadataIds(log: string, requestPath: string): string[] {
+  const ids: string[] = [];
+  const pattern = new RegExp(`^REQUEST_METADATA_ID ${requestPath.replace(/\//g, '\\/')} ([0-9a-f]{16})$`, 'gm');
+  for (let match = pattern.exec(log); match !== null; match = pattern.exec(log)) {
+    ids.push(match[1]);
+  }
+  return ids;
+}
 
 function request(port: number, requestPath: string, headers: { [name: string]: string }) {
   return new Promise<{ status: number; headers: http.IncomingHttpHeaders }>((resolve, reject) => {
