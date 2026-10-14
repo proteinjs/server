@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.12.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.11.0...@proteinjs/server@3.12.0) (2026-10-14)
+
+
+### Features
+
+* **server:** compress composed responses, echo the request id, time the Finished line ([bfe1b78](https://github.com/proteinjs/server/commit/bfe1b7870ac1edbeaf98e39b9815b83d0d996344))
+
+
+
+
+
 # [3.11.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.10.1...@proteinjs/server@3.11.0) (2026-10-10)
 
 
