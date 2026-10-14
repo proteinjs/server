@@ -1,0 +1,1 @@
+{ "branch": "feat/compression-and-request-id-r2", "packages": ["server"], "suites": ["packages/server/test/responseCompression.test.ts", "packages/server/test/requestIdHeader.test.ts", "packages/server/test/requestLogging.test.ts"], "removes": [] }
