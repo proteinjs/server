@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.12.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.12.0...@proteinjs/server@3.12.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **server:** a request that fails outside its route is answered 500 and never reaches the fatal boundary ([4b83fca](https://github.com/proteinjs/server/commit/4b83fca5e233bdb9114370f56a0175ef55ac6d22))
+
+
+
+
+
 # [3.12.0](https://github.com/proteinjs/server/compare/@proteinjs/server@3.11.0...@proteinjs/server@3.12.0) (2026-10-14)
 
 
