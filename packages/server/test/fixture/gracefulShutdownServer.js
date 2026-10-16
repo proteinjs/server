@@ -123,6 +123,23 @@ register('@proteinjs/server-api/Route', 'slowRoute', {
 });
 
 /**
+ * The session-cache-boundary suite's cache: a SessionDataCache the server builds on EVERY routed
+ * request, whose `create` rejects while armed. Armed by `GET /arm-session-cache-failure` (a
+ * beforeRequest seam below, answered in front of the routes — so the readiness poll, which rides
+ * a route, passes before a suite arms it); disarmed by `GET /disarm-session-cache-failure`.
+ */
+let sessionCacheFailureArmed = false;
+register('@proteinjs/server-api/SessionDataCache', 'fixtureSessionCache', {
+  key: 'fixture-session-cache',
+  create: async () => {
+    if (sessionCacheFailureArmed) {
+      throw new Error('the session cache build failed (FIXTURE_SESSION_CACHE_FAILURE)');
+    }
+    return { built: true };
+  },
+});
+
+/**
  * The raw-body suite's two routes, one declaring `rawBody` and one not: each answers with the bytes
  * the server kept for it (`RawBody.of`, base64 — null when none) beside the body it parsed.
  */
@@ -295,6 +312,11 @@ startServer({
       // A line written in front of the routes: the request has no metadata of its own yet, so what
       // a log writer reads here is whatever the dispatch's async context carries.
       console.log(`BEFORE_ROUTE_CONTEXT ${request.path} ${contextHere()}`);
+      if (request.path === '/arm-session-cache-failure' || request.path === '/disarm-session-cache-failure') {
+        sessionCacheFailureArmed = request.path === '/arm-session-cache-failure';
+        response.status(200).send(sessionCacheFailureArmed ? 'armed' : 'disarmed');
+        return;
+      }
       if (request.path === '/server-timeouts') {
         // The socket's `server` IS the live http.Server instance — the values the kernel-visible
         // connection actually runs under, not a copy of the config.

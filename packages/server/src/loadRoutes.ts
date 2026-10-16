@@ -107,7 +107,11 @@ function wrapRoute(
     });
     const sessionData: SessionData = { sessionId: request.sessionID, user: request.user as string, data: {} };
     for (const sessionDataCache of getSessionDataCaches()) {
-      sessionData.data[sessionDataCache.key] = await sessionDataCache.create(sessionData.sessionId, sessionData.user);
+      try {
+        sessionData.data[sessionDataCache.key] = await sessionDataCache.create(sessionData.sessionId, sessionData.user);
+      } catch (cause) {
+        throw new SessionDataCacheBuildError(sessionDataCache.key, cause);
+      }
     }
     // A request always seeds ITS OWN session context: on a reused keep-alive socket this
     // dispatch is born inside the previous request's async lineage (the storage's init hook
@@ -168,12 +172,51 @@ function wrapRoute(
     // route carries no request's metadata, and never another request's.
     const requestScope = new AsyncResource('ROUTED_REQUEST', { requireManualDestroy: true });
     try {
-      return requestScope.runInAsyncScope(handleRequest, null, request, response, next);
+      // The handler's promise is HELD here: express never looks at what a handler returns, so a
+      // rejection out of `handleRequest` — the session-cache build, a before/after-request
+      // listener; anything outside the route's own try — would otherwise reach the process as an
+      // unhandled rejection (the fatal boundary: exit 1, every request on the process with it)
+      // and leave this request unanswered.
+      return requestScope
+        .runInAsyncScope(handleRequest, null, request, response, next)
+        .catch((error: unknown) => failRequestOutsideRoute(error, request, response));
     } finally {
       // The scope's own entries go now; everything the request started holds its own copies.
       requestScope.emitDestroy();
     }
   };
+}
+
+/** A session data cache's `create` rejected while a request's session context was being built. */
+class SessionDataCacheBuildError extends Error {
+  constructor(
+    public readonly cacheKey: string,
+    public readonly cause: unknown
+  ) {
+    super(`Session data cache '${cacheKey}' failed to build`);
+    this.name = 'SessionDataCacheBuildError';
+  }
+}
+
+/**
+ * A request that failed OUTSIDE its route — the session-cache build, a request listener — is
+ * answered 500 (never left hanging, never the process's fatal boundary) and the failure is
+ * logged against the request's id, the one the response's header and every line it wrote carry.
+ */
+function failRequestOutsideRoute(error: unknown, request: express.Request, response: express.Response): void {
+  // The id off the response header the handler set first — this runs outside the request's
+  // async scope, where its metadata is not readable.
+  const id = response.getHeader(REQUEST_ID_HEADER);
+  logger.error({
+    message: `Request failed outside its route — answering 500`,
+    obj: { id: typeof id === 'string' ? id : undefined, url: RedactedUrl.of(request.originalUrl) },
+    error,
+  });
+  if (!response.headersSent) {
+    response.status(500).end();
+  } else if (!response.writableEnded) {
+    response.end();
+  }
 }
 
 /**
