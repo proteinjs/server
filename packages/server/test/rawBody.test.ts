@@ -27,6 +27,11 @@ const JSON_BODY = Buffer.from(
 const FORM_BODY = Buffer.from('customer=Zo%C3%AB+%C3%85ngstr%C3%B6m&note=na%C3%AFve+%E2%80%94&amount=4200', 'utf8');
 /** One byte over the parser's limit (100mb). */
 const OVER_THE_LIMIT_BYTES = 100 * 1024 * 1024 + 1;
+/**
+ * A form body whose brackets nest twice as deep as the form parser's bound (body-parser's depth, 32): before 1.20.3 the
+ * parser followed brackets to ANY depth (qs at depth Infinity, CVE-2024-45590 — thousands of levels for a few bytes each).
+ */
+const NESTED_FORM_BODY = Buffer.from(`a${'[b]'.repeat(64)}=1`, 'utf8');
 
 type Fixture = { child: ChildProcess; port: number; exited: Promise<unknown> };
 type Answer = { status: number; body: string };
@@ -84,6 +89,17 @@ describe('a route that declares rawBody', () => {
     expect(declared.body).not.toContain('rawBase64');
     expect(undeclared.body).not.toContain('rawBase64');
   }, 30000);
+
+  it("a form body nested past the parser's depth is refused the same way on both routes: 400, the route never runs", async () => {
+    const contentType = 'application/x-www-form-urlencoded';
+    const declared = await post(fixture.port, '/raw-body-route', contentType, NESTED_FORM_BODY);
+    const undeclared = await post(fixture.port, '/parsed-body-route', contentType, NESTED_FORM_BODY);
+
+    expect(declared.status).toBe(400);
+    expect(undeclared.status).toBe(400);
+    expect(declared.body).not.toContain('rawBase64');
+    expect(undeclared.body).not.toContain('rawBase64');
+  });
 });
 
 function post(port: number, requestPath: string, contentType: string, body: Buffer): Promise<Answer> {

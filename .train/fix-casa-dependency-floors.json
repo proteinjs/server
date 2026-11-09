@@ -1,0 +1,11 @@
+{
+  "branch": "fix/casa-dependency-floors",
+  "packages": [
+    "event",
+    "server"
+  ],
+  "suites": [
+    "packages/server/test/rawBody.test.ts"
+  ],
+  "removes": []
+}
