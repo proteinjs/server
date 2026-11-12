@@ -103,14 +103,16 @@ export interface ServerConfig {
     turnDrainMs?: number;
   };
   /**
-   * The security headers every response this server sends carries (`PageSecurityHeaders` in
-   * @proteinjs/server — one owner on the http server itself, so the socket transport's answers
-   * and the WebSocket upgrade carry them beside every route's, deciding by the response's class
-   * as its headers flush). Without a declaration: every page refuses framing
-   * (`Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`) unless its route
-   * declares `frameable`; every page carries `Referrer-Policy: strict-origin-when-cross-origin`;
-   * every response carries `X-Content-Type-Options: nosniff`. Each key below adds a header the
-   * deployment decides on.
+   * The security headers this server's answers carry (`PageSecurityHeaders` in @proteinjs/server —
+   * one owner on the http server itself, deciding by the response's class as its headers flush).
+   * Which answers: every one written through a response object on the http server — a route's, the
+   * socket transport's polling answers, socket.io's client script — and the 101 of an accepted
+   * WebSocket upgrade; an answer a library writes by itself (a refused upgrade, node's own answer
+   * to a request it cannot read) is outside, and the owner's class comment lists each. Without a
+   * declaration: every page refuses framing (`Content-Security-Policy: frame-ancestors 'none'`,
+   * `X-Frame-Options: DENY`) unless its route declares `frameable`; every page carries
+   * `Referrer-Policy: strict-origin-when-cross-origin`; every covered answer carries
+   * `X-Content-Type-Options: nosniff`. Each key below adds a header the deployment decides on.
    */
   pages?: {
     /**
@@ -121,7 +123,7 @@ export interface ServerConfig {
      */
     frameAncestors?: PageOrigin[];
     /**
-     * `Strict-Transport-Security` on every response answered over https (the request's own scheme,
+     * `Strict-Transport-Security` on every covered answer over https (the request's own scheme,
      * read behind `trust proxy` from the forwarded protocol — a browser ignores the header on plain
      * http, so none is sent there): `max-age=<maxAgeSeconds>`, `; includeSubDomains` when set, `;
      * preload` when set. A deployment declares it once every host under the origin's domain serves
@@ -148,8 +150,9 @@ export interface ServerConfig {
      * `reportOnly: true` sends it as `Content-Security-Policy-Report-Only` — the browser reports what
      * the policy WOULD block and blocks nothing — the posture a new policy runs in until its reports
      * come back clean; `false` enforces it. Either way the server mounts `POST /csp-report` and names
-     * it in the policy's `report-uri`, so every violation a browser sees lands in this process's log
-     * as one WARN line (the directive, the blocked source's origin, the page's redacted url). The
+     * it in the policy's `report-uri`, so a violation a browser reports lands in this process's log
+     * as one WARN line (the directive, the blocked source's origin, the page's redacted url) — at
+     * most twenty of one report body, and one more line counting the rest. The
      * framing directive is the route's (`frame-ancestors` here refuses to boot — `Route.frameable` is
      * the one declaration), and the framework's `frame-ancestors` header is sent beside this policy.
      */

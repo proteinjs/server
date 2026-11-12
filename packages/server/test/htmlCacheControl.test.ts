@@ -31,12 +31,15 @@ import { ChildProcess, spawn } from 'child_process';
  * http server itself, first of its listeners: every document carries `Content-Security-Policy:
  * frame-ancestors 'none'`, `X-Frame-Options: DENY` and `Referrer-Policy:
  * strict-origin-when-cross-origin`, a route may declare itself `frameable`, `X-Content-Type-Options:
- * nosniff` rides every response — the transport's long-polling answers, its refusals, socket.io's
- * client script and the WebSocket upgrade's 101 included — and the deployment's
- * declarations (`ServerConfig.pages`) add Strict-Transport-Security on every https response,
- * Permissions-Policy on every document, and a Content-Security-Policy — report-only or enforced —
- * whose reports the server takes at /csp-report and logs. The https redirect sends a plain-http
- * request to the declared origin (`ServerConfig.origin`), never to the Host header the request carried.
+ * nosniff` rides every answer the server hands a request listener — the transport's long-polling
+ * answers, its refusals of a poll and socket.io's client script included — and an accepted WebSocket
+ * upgrade's 101, and the deployment's declarations (`ServerConfig.pages`) add
+ * Strict-Transport-Security on each of those over https, Permissions-Policy on every document, and a
+ * Content-Security-Policy — report-only or enforced — whose reports the server takes at /csp-report
+ * and logs, at most twenty violations a body. The https redirect sends a plain-http request to the
+ * declared origin (`ServerConfig.origin`), never to the Host header the request carried. (What a
+ * library answers by itself, with no request listener — a refused upgrade, node's own answers to a
+ * request it cannot read — is outside by construction: `PageSecurityHeaders` lists it.)
  */
 const packageRoot = path.join(__dirname, '..');
 const fixturePath = path.join(__dirname, 'fixture', 'gracefulShutdownServer.js');
@@ -170,7 +173,7 @@ describe('page security headers', () => {
     expect(plain.headers['x-content-type-options']).toBe('nosniff');
   }, 30000);
 
-  it("the socket transport's answers carry them too — the long-polling handshake, a poll, the transport's own refusal, socket.io's client script and the WebSocket upgrade's 101", async () => {
+  it("the socket transport's answers carry them too — the long-polling handshake, a poll, the transport's own refusal of a poll, socket.io's client script and an accepted WebSocket upgrade's 101", async () => {
     fixture = await startFixture({ FIXTURE_ORIGIN: ORIGIN, FIXTURE_PAGES: JSON.stringify(DECLARED_PAGES) });
 
     // socket.io and engine.io intercept /socket.io/ ahead of express: no middleware ever sees these answers.
@@ -218,7 +221,7 @@ describe('page security headers', () => {
     expect(upgrade.headers['x-content-type-options']).toBe('nosniff');
   }, 30000);
 
-  it("a browser's violation report posted to /csp-report is answered 204 and logged as one line — the directive and the blocked origin, the page's url redacted", async () => {
+  it("a browser's violation report posted to /csp-report is answered 204 and logged as one line — the directive and the blocked origin, the page's url redacted; one body is logged for at most twenty violations and one more line counting the rest", async () => {
     fixture = await startFixture({ FIXTURE_ORIGIN: ORIGIN, FIXTURE_PAGES: JSON.stringify(DECLARED_PAGES) });
 
     const report = {
@@ -260,6 +263,24 @@ describe('page security headers', () => {
     });
     expect(withCookie.status).toBe(204);
     expect(sessionReads()).toBe(readsBeforeReport);
+
+    // Anyone can post here, and a body inside the size limit still holds hundreds of entries (the edge
+    // review's refuter, 2026-11-12: 615 empty Reporting-API entries in 15,376 bytes wrote 615 lines,
+    // fourteen times the request). One body is logged for twenty violations, and one more line says
+    // how many were not.
+    const entries = Array.from({ length: 615 }, () => ({ type: 'csp-violation' }));
+    const doorLines = () => output().split('[PageSecurityHeaders]').length - 1;
+    const violationLines = () => output().split('Content Security Policy violation reported').length - 1;
+    const doorLinesBefore = await settled(doorLines);
+    const violationLinesBefore = violationLines();
+    const flood = await request(fixture.port, '/csp-report', 'POST', {
+      body: JSON.stringify(entries),
+      contentType: 'application/reports+json',
+    });
+    expect(flood.status).toBe(204);
+    expect((await settled(doorLines)) - doorLinesBefore).toBe(21);
+    expect(violationLines() - violationLinesBefore).toBe(20);
+    expect(output().slice(output().lastIndexOf('[PageSecurityHeaders]'))).toContain(String(entries.length - 20));
   }, 30000);
 
   it('an enforced policy rides the one Content-Security-Policy header beside the framing refusal, reporting to the same door', async () => {
@@ -513,6 +534,18 @@ async function ephemeralPort(): Promise<number> {
       probe.close(() => resolve(address.port));
     });
   });
+}
+
+/** A count read off the fixture's output once it has stopped moving for 300 ms (the output arrives in chunks). */
+async function settled(count: () => number): Promise<number> {
+  let last = count();
+  for (let stillMs = 0; stillMs < 300; ) {
+    await sleep(50);
+    const now = count();
+    stillMs = now === last ? stillMs + 50 : 0;
+    last = now;
+  }
+  return last;
 }
 
 function sleep(ms: number): Promise<void> {

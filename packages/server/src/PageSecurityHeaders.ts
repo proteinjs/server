@@ -31,9 +31,9 @@ export type SocketTransportHeaders = {
 };
 
 /**
- * What `cover` stands on: the http server (every http response the process writes), the express app
- * (its `trust proxy` setting says whether a forwarded protocol is believed) and the socket transport
- * (the upgrade's 101, which is no http response).
+ * What `cover` stands on: the http server (every answer it hands a request listener), the express
+ * app (its `trust proxy` setting says whether a forwarded protocol is believed) and the socket
+ * transport (an accepted upgrade's 101, which is no response object).
  */
 export type ResponseSeams = {
   server: HttpServer;
@@ -45,12 +45,13 @@ export type ResponseSeams = {
  * The server's one owner of the security headers a response carries — decided as the response's
  * headers flush, by the response's CLASS, never per page:
  *
- *  - EVERY response, documents included, carries `X-Content-Type-Options: nosniff`: a script or
- *    style served under another type is never sniffed into one, a JSON answer never rendered as a
- *    page. Every response answered over https carries `Strict-Transport-Security` when the
- *    deployment declares it (`ServerConfig.pages.strictTransportSecurity`): the browser then reaches
- *    this host over https alone for the declared time, whatever a link or a typed address says. A
- *    browser ignores the header on plain http (RFC 6797 §8.1), so none is sent there.
+ *  - EVERY response this owner covers (the two sets are said below), documents included, carries
+ *    `X-Content-Type-Options: nosniff`: a script or style served under another type is never
+ *    sniffed into one, a JSON answer never rendered as a page. Each one answered over https carries
+ *    `Strict-Transport-Security` when the deployment declares it
+ *    (`ServerConfig.pages.strictTransportSecurity`): the browser then reaches this host over https
+ *    alone for the declared time, whatever a link or a typed address says. A browser ignores the
+ *    header on plain http (RFC 6797 §8.1), so none is sent there.
  *  - A DOCUMENT (`text/html`, `application/xhtml+xml`: the SPA shell, a consumer route's page,
  *    express's own error page, a redirect's body) REFUSES FRAMING — `Content-Security-Policy:
  *    frame-ancestors 'none'` and `X-Frame-Options: DENY`. The clickjacking shape: a page framed
@@ -82,26 +83,60 @@ export type ResponseSeams = {
  *  - A declared Content-Security-Policy names `report-uri /csp-report`, and this owner answers that
  *    door: a browser's violation report (either report format) becomes one WARN line — the
  *    directive, the blocked source's origin, the page's redacted url — so a report-only run is read
- *    from the log before the policy is enforced. Anyone can post to the door; it answers 204 and
- *    logs a bounded body, nothing more.
+ *    from the log before the policy is enforced. Anyone can post to the door, so what one post can
+ *    write is bounded: the door's own parser reads a body of at most 16 kB, at most twenty of its
+ *    violations are logged — every field of a line cut to a fixed length — and one more line says
+ *    how many were not. It answers 204, nothing more.
  *
- * MOUNTED ON THE HTTP SERVER ITSELF (`cover`), the one layer every http response the process writes
- * passes: a route's, the https redirect, express's own 404, `express.static`'s bytes — and the
- * answers no express middleware ever sees, because socket.io and its transport take their own path
- * off the server AHEAD of the app: engine.io's long-polling answers and its own refusals, and the
- * client script socket.io serves. The WebSocket upgrade's 101 is written on the raw socket and is no
- * http response, so the transport's `headers` hook carries the same headers onto it. What stays
- * outside: the answer node's own http parser writes on the raw socket to a request it could not read
- * (a bare 400, 408 or 431 with no body) — there is no response object to stamp. A policy a response
- * already carries stays: ours is appended as a second policy in the one header (CSP3 §3.1, a
- * comma-separated policy list; §8.1, every one enforced). `X-Frame-Options` is this owner's alone:
- * the declaration is the route's `frameable`, never a header a page sets itself.
+ * MOUNTED ON THE HTTP SERVER ITSELF (`cover`). Which answers that reaches is said by construction,
+ * in two sets, so the claim is never one path short:
+ *
+ * COVERED — every answer written through a response object the http server hands its request
+ * listeners (node's `request` event), because this owner is the first of those listeners:
+ *  - express's own: a route's, the https redirect, express's 404 and error pages, `express.static`'s
+ *    bytes;
+ *  - the answers no express middleware ever sees, because socket.io and its transport take their own
+ *    path off the server AHEAD of the app: engine.io's long-polling answers and its refusals of a
+ *    polling request, and the client script socket.io serves;
+ * and the 101 of an ACCEPTED WebSocket upgrade — no response object: ws writes it on the raw socket,
+ * and the transport's `headers` hook carries `X-Content-Type-Options` and `Strict-Transport-Security`
+ * onto it.
+ *
+ * OUTSIDE BY CONSTRUCTION — an answer a library writes by itself, with no `request` event and no
+ * hook: no listener is handed anything to stamp, and none of these carries a header of ours. Each
+ * is a fixed status line with a fixed body or none, and echoes nothing of the request. Read in the
+ * installed sources (node 22, engine.io 6.5.5, ws 8.17.1):
+ *  - node's http server, straight onto the raw socket, to a request it cannot read, too large or too
+ *    slow: a bare 400, 431 (the headers past their limit), 413 (a chunk's extensions past theirs)
+ *    and 408 (`headersTimeout`, `requestTimeout`) — lib/_http_server.js `socketOnError`, taken only
+ *    when nothing listens for `clientError`;
+ *  - node's http server, through a response of its own that it hands no listener
+ *    (lib/_http_server.js `parserOnIncoming`): a 400 to an HTTP/1.1 request with no Host header, a
+ *    417 to an `Expect` it does not know (taken only when nothing listens for `checkExpectation`),
+ *    the interim `100 Continue` ahead of an answer that IS covered, and a 503 past
+ *    `maxRequestsPerSocket`, which this server never sets;
+ *  - engine.io's refused upgrade (an unknown transport or session id, a bad handshake): a 400 with
+ *    one of its own fixed messages — build/server.js `abortUpgrade` (its `allowRequest` option, the
+ *    one seam that would put a consumer's words in that body, is not set);
+ *  - ws's refused handshake (a method, an Upgrade, a Sec-WebSocket-Key, -Version, -Protocol or
+ *    -Extensions header it does not take): a 405 or 400 with its own fixed message, and a 503 once
+ *    it is closing — lib/websocket-server.js `abortHandshake`.
+ * An upgrade on any other path is closed by engine.io with no answer at all. No wrapper stands on a
+ * raw socket's write and no `clientError` or `checkExpectation` handler is registered: rewriting
+ * bytes another library writes, for answers whose bodies are fixed strings, buys nothing. A library
+ * bump that adds an answer of this kind adds it to this list.
+ *
+ * A policy a response already carries stays: ours is appended as a second policy in the one header
+ * (CSP3 §3.1, a comma-separated policy list; §8.1, every one enforced). `X-Frame-Options` is this
+ * owner's alone: the declaration is the route's `frameable`, never a header a page sets itself.
  */
 export class PageSecurityHeaders {
   /** Where a browser posts a Content-Security-Policy violation report; named in every declared policy's `report-uri`. */
   static readonly CSP_REPORT_PATH = '/csp-report';
   private static readonly FRAMEABLE = 'pageSecurityHeaders.frameable';
   private static readonly REPORT_BODY_LIMIT = '16kb';
+  /** The most violations of one report body that are logged; the rest are counted in one more line. */
+  private static readonly REPORT_VIOLATIONS_LOGGED = 20;
   private static readonly REPORT_BODY_TYPES = [
     'application/csp-report',
     'application/reports+json',
@@ -128,7 +163,8 @@ export class PageSecurityHeaders {
   }
 
   /**
-   * Puts the headers on every response. Called AFTER the socket transport attached to the server:
+   * Puts the headers on every answer of the covered set (the class comment says both sets). Called
+   * AFTER the socket transport attached to the server:
    * socket.io and engine.io each take the server's request listeners for themselves as they attach
    * and call them only off their own paths, so a listener registered before them never sees a
    * socket request. Registered after them and FIRST in the server's list (`prependListener`): their
@@ -234,7 +270,9 @@ export class PageSecurityHeaders {
    * The report door: a browser's violation report, in the `report-uri` shape (`{ "csp-report": {…} }`,
    * sent as application/csp-report) or the Reporting API's (an array of `{ type, url, body }`), read
    * from a bounded body and written as one WARN line per violation — urls redacted the way the request
-   * log prints them (a page's query can carry a credential; a blocked source's can too).
+   * log prints them (a page's query can carry a credential; a blocked source's can too). One body is
+   * logged for at most `REPORT_VIOLATIONS_LOGGED` violations and one more line counting the rest: a
+   * body within the size limit can still hold hundreds of empty entries, and the door is open to anyone.
    */
   private static installReportDoor(app: express.Express): void {
     const parse = bodyParser.json({
@@ -242,15 +280,26 @@ export class PageSecurityHeaders {
       limit: PageSecurityHeaders.REPORT_BODY_LIMIT,
     });
     app.post(PageSecurityHeaders.CSP_REPORT_PATH, parse, (request: express.Request, response: express.Response) => {
-      for (const violation of PageSecurityHeaders.violationsIn(request.body)) {
-        logger.warn({ message: `Content Security Policy violation reported`, obj: violation });
+      const reports = PageSecurityHeaders.reportsIn(request.body);
+      const logged = reports.slice(0, PageSecurityHeaders.REPORT_VIOLATIONS_LOGGED);
+      for (const report of logged) {
+        logger.warn({
+          message: `Content Security Policy violation reported`,
+          obj: PageSecurityHeaders.violationOf(report),
+        });
+      }
+      if (reports.length > logged.length) {
+        logger.warn({
+          message: `Content Security Policy violations not logged: one report body carried more than ${logged.length}`,
+          obj: { notLogged: reports.length - logged.length },
+        });
       }
       response.status(204).end();
     });
   }
 
-  /** Every violation a report body carries, in one shape, every url redacted; a body of another shape carries none. */
-  private static violationsIn(body: unknown): Record<string, unknown>[] {
+  /** Every violation a report body carries, as the browser sent it; a body of another shape carries none. */
+  private static reportsIn(body: unknown): Record<string, unknown>[] {
     const reports: Record<string, unknown>[] = [];
     if (Array.isArray(body)) {
       for (const entry of body) {
@@ -263,7 +312,12 @@ export class PageSecurityHeaders {
       const inner = (body as Record<string, unknown>)['csp-report'];
       reports.push(inner && typeof inner === 'object' ? (inner as Record<string, unknown>) : {});
     }
-    return reports.map((report) => ({
+    return reports;
+  }
+
+  /** One violation as its log line carries it: the two report shapes in one, every url redacted, every field cut to a fixed length. */
+  private static violationOf(report: Record<string, unknown>): Record<string, unknown> {
+    return {
       documentUrl: PageSecurityHeaders.redacted(report['document-uri'] ?? report.documentURL),
       violatedDirective: PageSecurityHeaders.word(report['violated-directive'] ?? report.effectiveDirective),
       effectiveDirective: PageSecurityHeaders.word(report['effective-directive'] ?? report.effectiveDirective),
@@ -274,7 +328,7 @@ export class PageSecurityHeaders {
         typeof (report['line-number'] ?? report.lineNumber) === 'number'
           ? report['line-number'] ?? report.lineNumber
           : undefined,
-    }));
+    };
   }
 
   private static redacted(value: unknown): string | undefined {

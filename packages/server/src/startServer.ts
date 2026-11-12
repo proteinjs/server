@@ -84,10 +84,11 @@ export async function startServer(config: ServerConfig) {
   afterRequest(app, config);
   const io = await initializeSocketIO(app, server, config);
   // After the socket transport attached (socket.io and its engine take the server's request
-  // listeners for themselves and answer their own paths without them): every response the process
-  // writes — a route's, the https redirect, express's own 404, static file bytes, the transport's
-  // polling answers and its refusals, socket.io's client script, the WebSocket upgrade's 101 —
-  // carries the security headers its class calls for.
+  // listeners for themselves and answer their own paths without them): every answer the server
+  // hands a request listener — a route's, the https redirect, express's own 404, static file bytes,
+  // the transport's polling answers and its refusals of a poll, socket.io's client script — and an
+  // accepted WebSocket upgrade's 101 carry the security headers their class calls for. What a
+  // library writes by itself with no such listener is outside; PageSecurityHeaders lists it.
   pageSecurity.cover({ server, app, socketTransport: io.engine });
 
   await runStartupTasks('after server config');
