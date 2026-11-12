@@ -27,6 +27,8 @@ import { SocketHandshakeRefusals } from './SocketHandshakeRefusals';
 import { DevClientBuild } from './DevClientBuild';
 import { GracefulShutdown } from './GracefulShutdown';
 import { RedactedUrl } from './RedactedUrl';
+import { PageSecurityHeaders } from './PageSecurityHeaders';
+import { DeclaredOrigin } from './DeclaredOrigin';
 
 const staticContentPath = '/static/';
 const logger = new Logger({ name: 'Server' });
@@ -54,7 +56,8 @@ export async function startServer(config: ServerConfig) {
   GracefulShutdown.install(server, config);
   await runStartupTasks('before server config');
   const routes = getRoutes();
-  configureRequests(app, routes);
+  const pageSecurity = new PageSecurityHeaders(config);
+  configureRequests(app, routes, pageSecurity);
   const clientBuildReady = initializeHotReloading(app, config);
   configureSession(app, config);
   beforeRequest(app, config);
@@ -63,7 +66,7 @@ export async function startServer(config: ServerConfig) {
     app,
     config
   );
-  configureHttps(app); // registering here forces static content to be redirected to https
+  configureHttps(app, config); // registering here forces static content to be redirected to https
   configureStaticContentRouter(app, config);
   loadRoutes(
     routes.filter((route) => !route.useHttp),
@@ -79,7 +82,13 @@ export async function startServer(config: ServerConfig) {
 
   loadDefaultStarRoute(routes, app, config);
   afterRequest(app, config);
-  await initializeSocketIO(app, server, config);
+  const io = await initializeSocketIO(app, server, config);
+  // After the socket transport attached (socket.io and its engine take the server's request
+  // listeners for themselves and answer their own paths without them): every response the process
+  // writes — a route's, the https redirect, express's own 404, static file bytes, the transport's
+  // polling answers and its refusals, socket.io's client script, the WebSocket upgrade's 101 —
+  // carries the security headers its class calls for.
+  pageSecurity.cover({ server, app, socketTransport: io.engine });
 
   await runStartupTasks('after server config');
   if (config.onStartup) {
@@ -114,7 +123,10 @@ async function runStartupTasks(when: StartupTask['when']) {
   });
 }
 
-function configureRequests(app: express.Express, routes: Route[]) {
+function configureRequests(app: express.Express, routes: Route[], pageSecurity: PageSecurityHeaders) {
+  // First of all, ahead of the body parsers and the session: the door a browser posts a
+  // Content-Security-Policy violation report to, read by its own bounded parser.
+  pageSecurity.openReportDoor(app);
   ResponseCompression.install(app);
   app.use(cookieParser());
   RequestBodyParsers.install(app, routes);
@@ -263,15 +275,31 @@ function createWebpackConfigOverlay(config: ServerConfig, webpack: any, appRequi
   return devConfig;
 }
 
-function configureHttps(app: express.Express) {
+/**
+ * A plain-http request is redirected to https — at the deployment's declared origin
+ * (`ServerConfig.origin`: the Location is `<origin><path and query>`), never at a Location built
+ * from the request's own Host header, which any client writes; a process that declares no origin
+ * can only name the host the request carried. Skipped in DEVELOPMENT (a dev server is plain http)
+ * and for a request already answered. An http origin outside DEVELOPMENT refuses to boot: the
+ * redirect would send every request back to plain http.
+ */
+function configureHttps(app: express.Express, config: ServerConfig) {
+  const origin = config.origin ? DeclaredOrigin.of(config.origin, 'ServerConfig.origin') : undefined;
+  if (origin && !origin.startsWith('https://') && !process.env.DEVELOPMENT) {
+    throw new Error(
+      `ServerConfig.origin: ${origin} is not an https origin — plain-http requests are redirected there; a plain-http process sets DEVELOPMENT`
+    );
+  }
+
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
     if (request.protocol == 'https' || response.headersSent || process.env.DEVELOPMENT) {
       next();
       return;
     }
 
-    logger.debug({ message: `Redirecting to https: ${request.headers.host}${RedactedUrl.of(request.url)}` });
-    response.redirect('https://' + request.headers.host + request.url);
+    const target = origin ?? `https://${request.headers.host}`;
+    logger.debug({ message: `Redirecting to https: ${target}${RedactedUrl.of(request.url)}` });
+    response.redirect(target + request.url);
   });
 }
 
@@ -392,6 +420,7 @@ function afterRequest(app: express.Express, config: ServerConfig) {
   }
 }
 
+/** Attaches the socket transport to the http server, with the session shared and the handshake gated; returns the socket server. */
 async function initializeSocketIO(app: express.Express, server: HttpServer, config: ServerConfig) {
   const io = await SocketIOServerRepo.createSocketIOServer(server);
   // Every refused handshake leaves one WARN line, whoever refused it (the gate below or the transport),
@@ -434,6 +463,7 @@ async function initializeSocketIO(app: express.Express, server: HttpServer, conf
       socket.join(sessionId);
     }
   });
+  return io;
 }
 
 function start(server: HttpServer, config: ServerConfig, clientBuildReady?: Promise<void>) {

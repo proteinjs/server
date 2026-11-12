@@ -1,0 +1,19 @@
+{
+  "branch": "fix/casa-edge-tls-and-headers-r2",
+  "packages": ["api", "server"],
+  "suites": [
+    "packages/server/test/bundlesRedirect.test.ts",
+    "packages/server/test/gracefulShutdown.test.ts",
+    "packages/server/test/htmlCacheControl.test.ts",
+    "packages/server/test/keepAliveTimeouts.test.ts",
+    "packages/server/test/localStrategy.test.ts",
+    "packages/server/test/rawBody.test.ts",
+    "packages/server/test/requestIdHeader.test.ts",
+    "packages/server/test/requestLogging.test.ts",
+    "packages/server/test/responseCompression.test.ts",
+    "packages/server/test/sessionCacheBuildBoundary.test.ts",
+    "packages/server/test/sessionCookie.test.ts",
+    "packages/server/test/socketHandshakeRefusal.test.ts"
+  ],
+  "removes": []
+}
