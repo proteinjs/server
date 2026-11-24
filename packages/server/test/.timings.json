@@ -1,0 +1,27 @@
+{
+  "about": "Seconds per suite over its last green runs, oldest first; the median is the suite's weight when the land tool cuts this package's shards and a CI leg cuts its share (scripts/ci/DurationSharder.js). Written by the local verify after a green run — a measure, never a gate: a stale or missing file only makes the cut less even.",
+  "suites": {
+    "test/ClientAddress.test.ts": [0],
+    "test/RedactedUrl.test.ts": [0.1],
+    "test/bundlesRedirect.test.ts": [1.2],
+    "test/bundlesUrl.test.ts": [0],
+    "test/gracefulShutdown.test.ts": [19.4],
+    "test/holdSeam.test.ts": [0.1],
+    "test/htmlCacheControl.test.ts": [0.7],
+    "test/keepAliveTimeouts.test.ts": [7.2],
+    "test/localStrategy.test.ts": [2.2],
+    "test/rawBody.test.ts": [0.3],
+    "test/reactAppBoot.test.ts": [0.9],
+    "test/reactAppBundlesUrl.test.ts": [0.1],
+    "test/reactAppHeadTags.test.ts": [0.1],
+    "test/reactAppHotUpdate.test.ts": [0.1],
+    "test/requestIdHeader.test.ts": [1.1],
+    "test/requestLogging.test.ts": [6.2],
+    "test/responseCompression.test.ts": [1.1],
+    "test/sessionCacheBuildBoundary.test.ts": [0.4],
+    "test/sessionCookie.test.ts": [0.5],
+    "test/sessionDataRequestBoundary.test.ts": [0],
+    "test/socketHandshakeRefusal.test.ts": [2.6],
+    "test/socketMaxPayload.test.ts": [0.3]
+  }
+}
