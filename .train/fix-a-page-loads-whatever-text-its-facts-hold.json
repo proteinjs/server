@@ -1,0 +1,11 @@
+{
+  "branch": "fix/a-page-loads-whatever-text-its-facts-hold",
+  "packages": ["server"],
+  "suites": [
+    "packages/server/test/reactAppBoot.test.ts",
+    "packages/server/test/reactAppBundlesUrl.test.ts",
+    "packages/server/test/reactAppHeadTags.test.ts",
+    "packages/server/test/reactAppHotUpdate.test.ts"
+  ],
+  "removes": []
+}

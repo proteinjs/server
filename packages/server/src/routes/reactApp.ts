@@ -140,11 +140,22 @@ function crossOriginAttribute(crossOrigin: boolean): string {
   return crossOrigin ? " crossorigin='anonymous'" : '';
 }
 
-/** Every server-rendered script rendered CONCURRENTLY; emitted in registration order. */
+/** Every server-rendered script rendered CONCURRENTLY; emitted in registration order, each as ONE script of the page. */
 async function serverRenderedScriptTags(): Promise<string> {
   const scripts = getServerRenderedScripts();
   const rendered = await Promise.all(scripts.map((script) => script.script()));
-  return rendered.map((script) => `<script>${script}</script>`).join('\n');
+  return rendered.map((script) => `<script>${asOneScript(script)}</script>`).join('\n');
+}
+
+/**
+ * A script's text as the page keeps it inside ONE script element, whatever text its facts hold. A server-rendered
+ * script is an assignment of JSON (`proteinjs[key] = {…}`), so a `<` can stand only inside one of its strings. There,
+ * the three sequences an HTML parser reads inside a script element (`<!--`, `<script` and `</script`, in any case) are
+ * written with a backslash after the `<`, which a JavaScript string reads as the same characters: the page reads
+ * every fact as the server wrote it.
+ */
+function asOneScript(script: string): string {
+  return script.replace(/<(?=!--|\/?script)/gi, '<\\');
 }
 
 /**
