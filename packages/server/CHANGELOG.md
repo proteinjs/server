@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.12.2](https://github.com/proteinjs/server/compare/@proteinjs/server@3.12.1...@proteinjs/server@3.12.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **server:** a page loads whatever text its facts hold ([4adf3f8](https://github.com/proteinjs/server/commit/4adf3f8e823f6a6a45a1a2607f3f228c3b5466d6))
+
+
+
+
+
 ## [3.12.1](https://github.com/proteinjs/server/compare/@proteinjs/server@3.12.0...@proteinjs/server@3.12.1) (2026-10-16)
 
 

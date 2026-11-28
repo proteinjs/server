@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import * as vm from 'vm';
 
 /**
  * The react app page's boot shape:
@@ -164,5 +165,29 @@ describe('the react app page boots in one round', () => {
       expect(head).toContain(`<link rel='preload' href='/static/${asset}?v=cafe0123' as='script'>`);
     }
     expect(body).not.toContain('bundles/');
+  });
+
+  it('pin 4: a server-rendered script is ONE script of the page whatever text its facts hold, and the page reads the facts as the server wrote them', async () => {
+    fs.writeFileSync(path.join(tmp, 'bundles', 'app.js'), '');
+    const facts = {
+      name: 'Ada </script> Lovelace',
+      note: 'a <!-- b --> c <SCRIPT> d </ScRiPt> e \\</script> f <script',
+      sum: '1 < 2 and <b>3</b>',
+    };
+    scripts.push({ script: async () => `proteinjs['facts'] = ${JSON.stringify(facts)};` });
+
+    const { html } = await render(prodStaticContent());
+    // The registered script's own text: what the page wrote between the boot line and the first bundle, its tag off.
+    const tag = html.split('<script>proteinjs = {};</script>')[1].split('<script defer')[0].trim();
+    const text = tag.slice('<script>'.length, -'</script>'.length);
+
+    // Nothing in it reads as the end of the script, the start of another, or a comment, to the page's parser.
+    expect(text).not.toMatch(/<!--|<\/?script/i);
+    // A `<` before anything else is written as it came.
+    expect(text).toContain(JSON.stringify(facts.sum));
+    // And run as the page runs it, it writes the facts exactly.
+    const page = { proteinjs: {} as Record<string, unknown> };
+    vm.runInNewContext(text, page);
+    expect(JSON.parse(JSON.stringify(page.proteinjs))).toEqual({ facts });
   });
 });
